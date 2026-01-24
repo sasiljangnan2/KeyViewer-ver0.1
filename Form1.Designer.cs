@@ -38,6 +38,7 @@
             // 
             // panel1
             // 
+            panel1.BackColor = SystemColors.ControlDark;
             panel1.Location = new Point(81, 135);
             panel1.Name = "panel1";
             panel1.Size = new Size(104, 96);
@@ -46,6 +47,7 @@
             // 
             // panel2
             // 
+            panel2.BackColor = SystemColors.ControlDark;
             panel2.Location = new Point(191, 135);
             panel2.Name = "panel2";
             panel2.Size = new Size(104, 96);
@@ -54,6 +56,7 @@
             // 
             // panel3
             // 
+            panel3.BackColor = SystemColors.ControlDark;
             panel3.Location = new Point(301, 135);
             panel3.Name = "panel3";
             panel3.Size = new Size(104, 96);
@@ -61,6 +64,7 @@
             // 
             // panel4
             // 
+            panel4.BackColor = Color.Violet;
             panel4.Location = new Point(411, 135);
             panel4.Name = "panel4";
             panel4.Size = new Size(104, 96);
@@ -68,6 +72,7 @@
             // 
             // panel5
             // 
+            panel5.BackColor = SystemColors.ControlDark;
             panel5.Location = new Point(521, 135);
             panel5.Name = "panel5";
             panel5.Size = new Size(104, 96);
@@ -75,6 +80,7 @@
             // 
             // panel6
             // 
+            panel6.BackColor = SystemColors.ControlDark;
             panel6.Location = new Point(631, 135);
             panel6.Name = "panel6";
             panel6.Size = new Size(104, 96);
@@ -94,9 +100,8 @@
             KeyPreview = true;
             Name = "Form1";
             Text = "dasd";
-            Load += Form1_Load;
-           // KeyDown += Form1_KeyDown;
-           //KeyUp += Form1_KeyUp;
+            KeyDown += Form1_KeyDown;
+            KeyUp += Form1_KeyUp;
             ResumeLayout(false);
         }
 
