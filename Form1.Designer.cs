@@ -64,11 +64,12 @@
             // 
             // panel4
             // 
-            panel4.BackColor = Color.Violet;
+            panel4.BackColor = Color.MediumSlateBlue;
             panel4.Location = new Point(411, 135);
             panel4.Name = "panel4";
             panel4.Size = new Size(104, 96);
             panel4.TabIndex = 3;
+            panel4.Paint += panel4_Paint;
             // 
             // panel5
             // 
