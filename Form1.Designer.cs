@@ -64,7 +64,7 @@
             // 
             // panel4
             // 
-            panel4.BackColor = Color.MediumSlateBlue;
+            panel4.BackColor = SystemColors.ControlDark;
             panel4.Location = new Point(411, 135);
             panel4.Name = "panel4";
             panel4.Size = new Size(104, 96);
