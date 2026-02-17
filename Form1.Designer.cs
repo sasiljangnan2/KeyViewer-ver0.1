@@ -28,70 +28,17 @@
         /// </summary>
         private void InitializeComponent()
         {
-            panel1 = new Panel();
-            panel2 = new Panel();
-            panel3 = new Panel();
-            panel4 = new Panel();
-            panel5 = new Panel();
-            panel6 = new Panel();
+            panel1 = CreateButtonPanel("panel1", new System.Drawing.Point(81, 135), new System.Drawing.Size(104, 96), 0);
+            panel2 = CreateButtonPanel("panel2", new System.Drawing.Point(191, 135), new System.Drawing.Size(104, 96), 1);
+            panel3 = CreateButtonPanel("panel3", new System.Drawing.Point(301, 135), new System.Drawing.Size(104, 96), 2);
+            panel4 = CreateButtonPanel("panel4", new System.Drawing.Point(411, 135), new System.Drawing.Size(104, 96), 3);
+            panel5 = CreateButtonPanel("panel5", new System.Drawing.Point(521, 135), new System.Drawing.Size(104, 96), 4);
+            panel6 = CreateButtonPanel("panel6", new System.Drawing.Point(631, 135), new System.Drawing.Size(104, 96), 5);
             SuspendLayout();
-            // 
-            // panel1
-            // 
-            panel1.BackColor = SystemColors.ControlDark;
-            panel1.Location = new Point(81, 135);
-            panel1.Name = "panel1";
-            panel1.Size = new Size(104, 96);
-            panel1.TabIndex = 0;
-            panel1.Paint += panel1_Paint;
-            // 
-            // panel2
-            // 
-            panel2.BackColor = SystemColors.ControlDark;
-            panel2.Location = new Point(191, 135);
-            panel2.Name = "panel2";
-            panel2.Size = new Size(104, 96);
-            panel2.TabIndex = 1;
-            panel2.Paint += panel2_Paint;
-            // 
-            // panel3
-            // 
-            panel3.BackColor = SystemColors.ControlDark;
-            panel3.Location = new Point(301, 135);
-            panel3.Name = "panel3";
-            panel3.Size = new Size(104, 96);
-            panel3.TabIndex = 2;
-            // 
-            // panel4
-            // 
-            panel4.BackColor = SystemColors.ControlDark;
-            panel4.Location = new Point(411, 135);
-            panel4.Name = "panel4";
-            panel4.Size = new Size(104, 96);
-            panel4.TabIndex = 3;
-            panel4.Paint += panel4_Paint;
-            // 
-            // panel5
-            // 
-            panel5.BackColor = SystemColors.ControlDark;
-            panel5.Location = new Point(521, 135);
-            panel5.Name = "panel5";
-            panel5.Size = new Size(104, 96);
-            panel5.TabIndex = 4;
-            // 
-            // panel6
-            // 
-            panel6.BackColor = SystemColors.ControlDark;
-            panel6.Location = new Point(631, 135);
-            panel6.Name = "panel6";
-            panel6.Size = new Size(104, 96);
-            panel6.TabIndex = 5;
-            // 
-            // Form1
-            // 
-            AutoScaleDimensions = new SizeF(7F, 15F);
-            AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 450);
+
+            AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
+            AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            ClientSize = new System.Drawing.Size(800, 450);
             Controls.Add(panel6);
             Controls.Add(panel5);
             Controls.Add(panel4);
@@ -108,11 +55,11 @@
 
         #endregion
 
-        private Panel panel1;
-        private Panel panel2;
-        private Panel panel3;
-        private Panel panel4;
-        private Panel panel5;
-        private Panel panel6;
+        private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.Panel panel2;
+        private System.Windows.Forms.Panel panel3;
+        private System.Windows.Forms.Panel panel4;
+        private System.Windows.Forms.Panel panel5;
+        private System.Windows.Forms.Panel panel6;
     }
 }
