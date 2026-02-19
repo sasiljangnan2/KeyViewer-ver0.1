@@ -30,78 +30,31 @@ namespace keyviewer
         private const int WM_SYSKEYUP = 0x0105;
         private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
-        // KeyPanel 리스트 (객체지향 매핑)
-        private List<KeyPanel> _keyPanels = new List<KeyPanel>();
+        // KeyPanel 서비스(팩토리 + 관리)
+        private KeyPanelService _panelService = null!;
+        // 로컬 참조(간편 접근)
+        private List<KeyPanel> _keyPanels => _panelService.KeyPanels;
 
         public Form1()
         {
             InitializeComponent();
 
-            // 모든 Panel에 마우스 이벤트 등록 (디자이너/팩토리로 만든 패널도 포함)
-            foreach (Control c in Controls)
-            {
-                if (c is Panel p)
-                {
-                    p.MouseDown += Panel_MouseDown;
-                    p.MouseMove += Panel_MouseMove;
-                    p.MouseUp += Panel_MouseUp;
-                }
-            }
+            // 서비스 생성: Form의 마우스 드래그 핸들러를 전달
+            _panelService = new KeyPanelService(this, _defaultColor, Panel_MouseDown, Panel_MouseMove, Panel_MouseUp);
 
-            // KeyPanel 객체로 매핑: (패널, 키, DownColor, UpColor)
-            _keyPanels = new List<KeyPanel>
-            {
-                new KeyPanel(panel1, Keys.A, Color.Red, _defaultColor),
-                new KeyPanel(panel2, Keys.S, Color.Red, _defaultColor),
-                new KeyPanel(panel3, Keys.D, Color.Red, _defaultColor),
-                new KeyPanel(panel4, Keys.L, Color.Red, _defaultColor),
-                new KeyPanel(panel5, Keys.Oem1, Color.Red, _defaultColor),
-                new KeyPanel(panel6, Keys.Oem7, Color.Red, _defaultColor)
-            };
+            // 디자이너에서 만든 기존 Panel들을 서비스로 래핑 (키 매핑 지정)
+            _panelService.WrapExistingPanel(panel1, Keys.A, Color.Red, _defaultColor);
+            _panelService.WrapExistingPanel(panel2, Keys.S, Color.Red, _defaultColor);
+            _panelService.WrapExistingPanel(panel3, Keys.D, Color.Red, _defaultColor);
+            _panelService.WrapExistingPanel(panel4, Keys.L, Color.Red, _defaultColor);
+            _panelService.WrapExistingPanel(panel5, Keys.Oem1, Color.Red, _defaultColor);
+            _panelService.WrapExistingPanel(panel6, Keys.Oem7, Color.Red, _defaultColor);
 
             // 전역 후크 설치
             _proc = HookCallback;
             _hookID = InstallHook(_proc);
         }
 
-        // 런타임/디자이너 공용 패널 팩토리
-        private Panel CreateButtonPanel(string name, Point location, Size size, int tabIndex)
-        {
-            var p = new Panel
-            {
-                BackColor = _defaultColor,
-                Location = location,
-                Name = name,
-                Size = size,
-                TabIndex = tabIndex
-            };
-
-            // 기본 Mouse 이벤트 바인딩은 생성 후 Form1 생성자에서 일괄 등록하므로 여기서는 생략.
-            return p;
-        }
-
-        // 런타임에서 패널+키 매핑을 추가하는 편의 메서드
-        public KeyPanel AddKeyPanel(Keys key, Color downColor, Color upColor, Point location, Size? size = null)
-        {
-            Size panelSize = size ?? new Size(104, 96);
-            // 이름 충돌 가능성 있으므로 안전하게 고유 이름 생성
-            string nameBase = "panel";
-            int idx = 1;
-            while (Controls.Find(nameBase + idx, false).Length > 0) idx++;
-            string name = nameBase + idx;
-
-            var panel = CreateButtonPanel(name, location, panelSize, Controls.Count);
-            Controls.Add(panel);
-
-            // 마우스 드래그 이벤트 연결
-            panel.MouseDown += Panel_MouseDown;
-            panel.MouseMove += Panel_MouseMove;
-            panel.MouseUp += Panel_MouseUp;
-
-            var kp = new KeyPanel(panel, key, downColor, upColor);
-            _keyPanels.Add(kp);
-            return kp;
-        }
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             // 폼 종료 시 후크 해제
@@ -201,7 +154,8 @@ namespace keyviewer
             int maxY = ClientSize.Height - _draggedControl.Height;
             int clampedX = Math.Max(0, Math.Min(desired.X, maxX));
             int clampedY = Math.Max(0, Math.Min(desired.Y, maxY));
-
+            clampedX -= clampedX % 10;
+            clampedY -= clampedY % 10;
             _draggedControl.Location = new Point(clampedX, clampedY);
         }
 
