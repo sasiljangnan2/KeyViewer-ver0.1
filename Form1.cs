@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.Collections.Generic;
 
 namespace keyviewer
 {
@@ -29,20 +30,25 @@ namespace keyviewer
         private const int WM_SYSKEYUP = 0x0105;
         private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
+        // KeyPanel 서비스(팩토리 + 관리)
+        private KeyPanelService _panelService = null!;
+        // 로컬 참조(간편 접근)
+        private List<KeyPanel> _keyPanels => _panelService.KeyPanels;
+
         public Form1()
         {
             InitializeComponent();
 
-            // 모든 Panel에 마우스 이벤트 등록
-            foreach (Control c in Controls)
-            {
-                if (c is Panel p)
-                {
-                    p.MouseDown += Panel_MouseDown;
-                    p.MouseMove += Panel_MouseMove;
-                    p.MouseUp += Panel_MouseUp;
-                }
-            }
+            // 서비스 생성: Form의 마우스 드래그 핸들러를 전달
+            _panelService = new KeyPanelService(this, _defaultColor, Panel_MouseDown, Panel_MouseMove, Panel_MouseUp);
+
+            // 디자이너에서 만든 기존 Panel들을 서비스로 래핑 (키 매핑 지정)
+            _panelService.WrapExistingPanel(panel1, Keys.A, Color.Red, _defaultColor);
+            _panelService.WrapExistingPanel(panel2, Keys.S, Color.Red, _defaultColor);
+            _panelService.WrapExistingPanel(panel3, Keys.D, Color.Red, _defaultColor);
+            _panelService.WrapExistingPanel(panel4, Keys.L, Color.Red, _defaultColor);
+            _panelService.WrapExistingPanel(panel5, Keys.Oem1, Color.Red, _defaultColor);
+            _panelService.WrapExistingPanel(panel6, Keys.Oem7, Color.Red, _defaultColor);
 
             // 전역 후크 설치
             _proc = HookCallback;
@@ -98,25 +104,21 @@ namespace keyviewer
             return CallNextHookEx(_hookID, nCode, wParam, lParam);
         }
 
-        // 전역 키 핸들러 (UI 변경은 UI 스레드에서 실행됨)
+        // 전역 키 핸들러: KeyPanel에 위임
         private void HandleGlobalKeyDown(Keys key)
         {
-            if (key == Keys.A) panel1.BackColor = Color.Red;
-            else if (key == Keys.S) panel2.BackColor = Color.Red;
-            else if (key == Keys.D) panel3.BackColor = Color.Red;
-            else if (key == Keys.L) panel4.BackColor = Color.Red;
-            else if (key == Keys.Oem1) panel5.BackColor = Color.Red; // ';' 레이아웃에 따라 다름
-            else if (key == Keys.Oem7) panel6.BackColor = Color.Red; // ''' 레이아웃에 따라 다름
+            foreach (var kp in _keyPanels)
+            {
+                kp.HandleKeyDown(key);
+            }
         }
 
         private void HandleGlobalKeyUp(Keys key)
         {
-            if (key == Keys.A) panel1.BackColor = _defaultColor;
-            else if (key == Keys.S) panel2.BackColor = _defaultColor;
-            else if (key == Keys.D) panel3.BackColor = _defaultColor;
-            else if (key == Keys.L) panel4.BackColor = _defaultColor;
-            else if (key == Keys.Oem1) panel5.BackColor = _defaultColor;
-            else if (key == Keys.Oem7) panel6.BackColor = _defaultColor;
+            foreach (var kp in _keyPanels)
+            {
+                kp.HandleKeyUp(key);
+            }
         }
 
         // 키 폼 이벤트(로컬 포커스용, 필요하면 사용)
@@ -152,7 +154,8 @@ namespace keyviewer
             int maxY = ClientSize.Height - _draggedControl.Height;
             int clampedX = Math.Max(0, Math.Min(desired.X, maxX));
             int clampedY = Math.Max(0, Math.Min(desired.Y, maxY));
-
+            clampedX -= clampedX % 10;
+            clampedY -= clampedY % 10;
             _draggedControl.Location = new Point(clampedX, clampedY);
         }
 
@@ -180,5 +183,10 @@ namespace keyviewer
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        private void panel4_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
     }
 }
