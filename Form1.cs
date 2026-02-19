@@ -9,6 +9,8 @@ namespace keyviewer
 {
     public partial class Form1 : Form
     {
+        // 컨텍스트 메뉴
+        private ContextMenuStrip _contextMenuStrip = null!;
         private readonly Color[] _colors = { Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Purple, Color.Orange };
         private int _colorIndex = 0;
         private readonly Color _defaultColor = SystemColors.ControlDark;
@@ -39,6 +41,9 @@ namespace keyviewer
         {
             InitializeComponent();
 
+            // 컨텍스트 메뉴 초기화
+            InitializeContextMenu();
+
             // 서비스 생성: Form의 마우스 드래그 핸들러를 전달
             _panelService = new KeyPanelService(this, _defaultColor, Panel_MouseDown, Panel_MouseMove, Panel_MouseUp);
 
@@ -53,6 +58,9 @@ namespace keyviewer
             // 전역 후크 설치
             _proc = HookCallback;
             _hookID = InstallHook(_proc);
+
+            // 폼 자체의 우클릭도 컨텍스트 메뉴가 뜨도록 연결
+            this.ContextMenuStrip = _contextMenuStrip;
         }
 
         protected override void OnFormClosed(FormClosedEventArgs e)
@@ -130,6 +138,16 @@ namespace keyviewer
         // --- 마우스 드래그 핸들러 ---
         private void Panel_MouseDown(object? sender, MouseEventArgs e)
         {
+            // 우클릭: 컨텍스트 메뉴 표시
+            if (e.Button == MouseButtons.Right)
+            {
+                if (sender is Control ctrl)
+                {
+                    _contextMenuStrip?.Show(ctrl, e.Location);
+                }
+                return;
+            }
+
             if (e.Button != MouseButtons.Left) return;
             if (sender is Control c)
             {
@@ -139,6 +157,27 @@ namespace keyviewer
                 _dragStartLocation = c.Location;
                 c.Capture = true;
             }
+        }
+
+        // 컨텍스트 메뉴 생성 및 항목 연결
+        private void InitializeContextMenu()
+        {
+            _contextMenuStrip = new ContextMenuStrip();
+
+            var toggleTopMost = new ToolStripMenuItem("Always on Top");
+            toggleTopMost.CheckOnClick = true;
+            toggleTopMost.Checked = this.TopMost;
+            toggleTopMost.Click += (s, e) =>
+            {
+                this.TopMost = toggleTopMost.Checked;
+            };
+
+            var exitItem = new ToolStripMenuItem("Exit");
+            exitItem.Click += (s, e) => this.Close();
+
+            _contextMenuStrip.Items.Add(toggleTopMost);
+            _contextMenuStrip.Items.Add(new ToolStripSeparator());
+            _contextMenuStrip.Items.Add(exitItem);
         }
 
         private void Panel_MouseMove(object? sender, MouseEventArgs e)
@@ -185,6 +224,11 @@ namespace keyviewer
         private static extern IntPtr GetModuleHandle(string lpModuleName);
 
         private void panel4_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
         {
 
         }

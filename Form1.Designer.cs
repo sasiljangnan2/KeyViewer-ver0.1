@@ -91,7 +91,7 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(684, 161);
+            ClientSize = new Size(670, 173);
             Controls.Add(panel6);
             Controls.Add(panel5);
             Controls.Add(panel4);
@@ -101,6 +101,7 @@
             KeyPreview = true;
             Name = "Form1";
             Text = "dasd";
+            Load += Form1_Load;
             KeyDown += Form1_KeyDown;
             KeyUp += Form1_KeyUp;
             ResumeLayout(false);
