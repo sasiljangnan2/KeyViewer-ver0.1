@@ -174,10 +174,46 @@ namespace keyviewer
 
             var exitItem = new ToolStripMenuItem("Exit");
             exitItem.Click += (s, e) => this.Close();
+           
+            var addPanelItem = new ToolStripMenuItem("Add Key Panel");
+            addPanelItem.Click += (s, e) =>
+            {
+                // 위치: 마우스 위치를 폼 좌표로 변환, 그리드 10에 맞춤
+                Point loc = PointToClient(Cursor.Position);
+                loc.X -= loc.X % 10;
+                loc.Y -= loc.Y % 10;
+                using var picker = new KeyPickerForm();
+                if (picker.ShowDialog(this) == DialogResult.OK)
+                {
+                    // 새 KeyPanel 생성
+                    var kp = _panelService.AddKeyPanel(picker.SelectedKey, picker.SelectedColor, _defaultColor, loc, new Size(85, 85));
+
+                    // 라벨 추가 (키 이름 표시)
+                   /* var lbl = new Label
+                    {
+                        Text = kp.Key.ToString(),
+                        Dock = DockStyle.Fill,
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        BackColor = Color.Transparent,
+                        ForeColor = GetContrastColor(picker.SelectedColor)
+                    };
+                    kp.Panel.Controls.Add(lbl);*/
+                }
+            };
 
             _contextMenuStrip.Items.Add(toggleTopMost);
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
-            _contextMenuStrip.Items.Add(exitItem);
+            _contextMenuStrip.Items.Add(addPanelItem);
+            _contextMenuStrip.Items.Add(new ToolStripSeparator());
+           _contextMenuStrip.Items.Add(exitItem);
+        }
+
+        // 간단한 대비 색 반환(전경색 자동 선택)
+        private Color GetContrastColor(Color bg)
+        {
+            // YIQ 밝기 공식
+            int yiq = ((bg.R * 299) + (bg.G * 587) + (bg.B * 114)) / 1000;
+            return yiq >= 128 ? Color.Black : Color.White;
         }
 
         private void Panel_MouseMove(object? sender, MouseEventArgs e)
