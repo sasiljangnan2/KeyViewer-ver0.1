@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Drawing;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Collections.Generic;
@@ -8,7 +9,6 @@ using System.IO;
 
 namespace keyviewer
 {
-
     public partial class Form1 : Form
     {
         // 컨텍스트 메뉴
@@ -46,26 +46,45 @@ namespace keyviewer
         // 로컬 참조(간편 접근)
         private List<KeyPanel> _keyPanels => _panelService.KeyPanels;
 
-        // 디자이너에서 래핑한 초기 패널 수(런타임으로 추가된 패널 삭제를 위해)
+        // 디자이너에서 래핑한 초기 패널 수 제거: 이제 디자이너 패널 사용 안 함
         private int _initialWrappedCount = 0;
+
+        // 현재 배경 이미지 경로 (선택적으로 저장) 및 배경 색
+        private string? _currentBgImagePath = null;
+        private Color _currentBgColor;
+
+        // P/Invoke: 키보드 훅 관련 (필요)
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr GetModuleHandle(string lpModuleName);
 
         public Form1()
         {
             InitializeComponent();
 
+            // 초기 배경 상태 저장
+            _currentBgColor = this.BackColor;
+
             // 레이아웃 폴더 보장
             Directory.CreateDirectory(_layoutsDir);
 
-            // 컨텍스트 메뉴 초기화
-            InitializeContextMenu();   
+            // 컨텍스트 메뉴 초기화 (먼저 생성)
+            InitializeContextMenu();
 
-            // 서비스 생성: Form의 마우스 드래그 핸들러를 전달
-            _panelService = new KeyPanelService(this, _defaultColor, Panel_MouseDown, Panel_MouseMove, Panel_MouseUp);
+            // 서비스 생성: Form의 마우스 드래그 핸들러를 전달하고 컨텍스트 메뉴 자동 할당 위임
+            _panel_service_create:
+            _panelService = new KeyPanelService(this, _defaultColor, Panel_MouseDown, Panel_MouseMove, Panel_MouseUp, _contextMenuStrip);
 
-            // 디자이너에서 만든 기존 Panel들을 서비스로 래핑 (키 매핑 지정)
-         
-
-            // 초기 래핑된 개수 저장
+            // 초기 래핑된 개수 저장 (디자이너 패널을 더 이상 래핑하지 않음)
             _initialWrappedCount = _keyPanels.Count;
 
             // 전역 후크 설치
@@ -79,7 +98,7 @@ namespace keyviewer
         // 레이아웃 목록 로드
         private void RefreshLayoutList()
         {
-            _cbLayouts.Items.Clear();
+            _cbLayouts?.Items.Clear();
             foreach (var file in Directory.GetFiles(_layoutsDir, "*.json"))
             {
                 _cbLayouts.Items.Add(Path.GetFileNameWithoutExtension(file));
@@ -87,7 +106,6 @@ namespace keyviewer
             if (_cbLayouts.Items.Count > 0)
                 _cbLayouts.SelectedIndex = 0;
         }
-
 
         private void SaveCurrentLayout()
         {
@@ -140,7 +158,6 @@ namespace keyviewer
         // 런타임으로 추가된 패널을 제거(디자이너 패널은 유지)
         private void RemoveRuntimePanels()
         {
-            // 제거 대상: _keyPanels 인스턴스 중 초기 래핑된 것 이후에 추가된 것들
             var runtime = new List<KeyPanel>();
             for (int i = _initialWrappedCount; i < _keyPanels.Count; i++)
             {
@@ -149,7 +166,6 @@ namespace keyviewer
 
             foreach (var kp in runtime)
             {
-                // Controls에서 제거
                 if (kp.Panel.Parent != null)
                     Controls.Remove(kp.Panel);
                 _keyPanels.Remove(kp);
@@ -175,14 +191,6 @@ namespace keyviewer
             return SetWindowsHookEx(WH_KEYBOARD_LL, proc, moduleHandle, 0);
         }
 
-        // 폴더/폰트 대화상자 이벤트(사용하지 않으면 그대로 둬도 됩니다)
-        private void folderBrowserDialog1_HelpRequest(object sender, EventArgs e) { }
-
-        private void fontDialog1_Apply(object sender, EventArgs e) { }
-
-        private void panel1_Paint(object sender, PaintEventArgs e) { }
-
-        // --- 전역 후크 콜백 ---
         private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
             if (nCode >= 0)
@@ -205,7 +213,6 @@ namespace keyviewer
             return CallNextHookEx(_hookID, nCode, wParam, lParam);
         }
 
-        // 전역 키 핸들러: KeyPanel에 위임
         private void HandleGlobalKeyDown(Keys key)
         {
             foreach (var kp in _keyPanels)
@@ -221,12 +228,6 @@ namespace keyviewer
                 kp.HandleKeyUp(key);
             }
         }
-
-        // 키 폼 이벤트(로컬 포커스용, 필요하면 사용)
-        private void Form1_KeyDown(object sender, KeyEventArgs e) { /* 기존 로컬 처리 있으면 유지 */ }
-        private void Form1_KeyUp(object sender, KeyEventArgs e) { /* 기존 로컬 처리 있으면 유지 */ }
-
-        private void panel2_Paint(object sender, PaintEventArgs e) { }
 
         // --- 마우스 드래그 핸들러 ---
         private void Panel_MouseDown(object? sender, MouseEventArgs e)
@@ -289,122 +290,123 @@ namespace keyviewer
             return yiq >= 128 ? Color.Black : Color.White;
         }
 
-        // P/Invoke
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr GetModuleHandle(string lpModuleName);
-
-        private void panel4_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
-
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
-        }
-        // 컨택스트 매뉴
+        // 컨택스트 매뉴 및 Global Settings 등 기존 코드 유지
         private void InitializeContextMenu()
         {
-            // 위치: 마우스 위치를 폼 좌표로 변환, 그리드 10에 맞춤
-            Point loc = PointToClient(Cursor.Position);
-            loc.X -= loc.X % 10;
-            loc.Y -= loc.Y % 10;
+            // 클릭 시점의 마우스 위치를 폼 좌표로 계산 — 이전에는 초기화 시점에만 계산되어 문제가 있었습니다.
+           
+
             _contextMenuStrip = new ContextMenuStrip();
 
             var toggleTopMost = new ToolStripMenuItem("Always on Top");
             toggleTopMost.CheckOnClick = true;
             toggleTopMost.Checked = this.TopMost;
-            toggleTopMost.Click += (s, e) =>
-            {
-                this.TopMost = toggleTopMost.Checked;
-            };
+            toggleTopMost.Click += (s, e) => this.TopMost = toggleTopMost.Checked;
 
-            var exitItem = new ToolStripMenuItem("Exit");
-            exitItem.Click += (s, e) => this.Close();
-
-            // 새 항목: Layouts...
             var layoutsItem = new ToolStripMenuItem("Layouts...");
             layoutsItem.Click += (s, e) =>
             {
-                string layoutsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "layouts");
-                if (!Directory.Exists(layoutsDir))
-                    Directory.CreateDirectory(layoutsDir);
-
+                string layoutsDir = _layoutsDir;
+                if (!Directory.Exists(layoutsDir)) Directory.CreateDirectory(layoutsDir);
                 using var dlg = new LayoutPickerForm(layoutsDir);
                 if (dlg.ShowDialog(this) == DialogResult.OK && !string.IsNullOrEmpty(dlg.SelectedLayoutFileName))
                 {
                     string path = Path.Combine(layoutsDir, dlg.SelectedLayoutFileName + ".json");
                     var layout = LayoutManager.LoadLayout(path);
-                    if (layout == null)
-                    {
-                        MessageBox.Show(this, "레이아웃을 불러올 수 없습니다.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-
-                    // 기존 런타임 패널 제거 후 적용
+                    if (layout == null) { MessageBox.Show(this, "레이아웃을 불러올 수 없습니다."); return; }
                     RemoveRuntimePanels();
                     var created = LayoutManager.ApplyLayout(layout, _panelService);
-
                     foreach (var kp in created)
                     {
-                        var lbl = new Label
-                        {
-                            Text = kp.Key.ToString(),
-                            Dock = DockStyle.Fill,
-                            TextAlign = ContentAlignment.MiddleCenter,
-                            BackColor = Color.Transparent,
-                            ForeColor = GetContrastColor(kp.Panel.BackColor),
-                            Cursor = Cursors.SizeAll
-                        };
-                        lbl.MouseDown += (ls, le) => Panel_MouseDown(kp.Panel, le);
-                        lbl.MouseMove += (ls, le) => Panel_MouseMove(kp.Panel, le);
-                        lbl.MouseUp += (ls, le) => Panel_MouseUp(kp.Panel, le);
-                        lbl.ContextMenuStrip = _contextMenuStrip;
-                        kp.Panel.Controls.Add(lbl);
+                        // 패널에 paint 기반 키 그리기 핸들러를 등록
+                        AttachKeyPaint(kp);
+                        kp.Panel.ContextMenuStrip = _contextMenuStrip;
                     }
                 }
             };
 
-            // 새 항목: Save Layout...
             var saveLayoutItem = new ToolStripMenuItem("Save Layout...");
-            saveLayoutItem.Click += (s, e) =>
-            {
-                // 기존 SaveCurrentLayout()를 재사용
-                SaveCurrentLayout();
-            };
+            saveLayoutItem.Click += (s, e) => SaveCurrentLayout();
 
             var addPanelItem = new ToolStripMenuItem("Add Key Panel");
             addPanelItem.Click += (s, e) =>
             {
-                
-                using var picker = new KeyPickerForm();
-                if (picker.ShowDialog(this) == DialogResult.OK)
+                Point loc = PointToClient(Cursor.Position);
+                loc.X -= loc.X % 10;
+                loc.Y -= loc.Y % 10;
+                int w = 85, h = 85;
+                loc.X = Math.Clamp(loc.X, 0, Math.Max(0, ClientSize.Width - w));
+                loc.Y = Math.Clamp(loc.Y, 0, Math.Max(0, ClientSize.Height - h));
+
+                using var editor = new PanelEditorForm();
+                if (editor.ShowDialog(this) == DialogResult.OK)
                 {
-                    var kp = _panelService.AddKeyPanel(picker.SelectedKey, picker.SelectedColor, _defaultColor, loc, new Size(85, 85));
-                    /*var lbl = new Label
+                    var up = editor.SelectedUpColor;
+                    var down = editor.SelectedDownColor;
+                    var kp = _panelService.AddKeyPanel(editor.SelectedKey, down, up, loc, new Size(w, h));
+                    kp.Panel.ContextMenuStrip = _contextMenuStrip;
+                    kp.Panel.BackColor = kp.UpColor;
+
+                    // 패널 내부에 별도 라벨을 추가하지 않고, Paint로 키를 그리도록 등록
+                    AttachKeyPaint(kp);
+                    kp.Panel.BringToFront();
+                }
+            };
+
+            var setEditorItem = new ToolStripMenuItem("Edit Panel...");
+            setEditorItem.Click += (s, e) =>
+            {
+                var kp = GetKeyPanelFromContext();
+                if (kp == null) return;
+                OpenPanelEditor(kp);
+            };
+
+            var exitItem = new ToolStripMenuItem("Exit");
+            exitItem.Click += (s, e) => this.Close();
+
+            var globalSettingsItem = new ToolStripMenuItem("Global Settings...");
+            globalSettingsItem.Click += (s, e) =>
+            {
+                Color upInit = _keyPanels.Count > 0 ? _keyPanels[0].UpColor : _defaultColor;
+                Color downInit = _keyPanels.Count > 0 ? _keyPanels[0].DownColor : Color.Red;
+                Color bgInit = this.BackColor;
+                string? currentBgPath = _currentBgImagePath;
+                int keyAlphaInit = _keyPanels.Count > 0 ? _keyPanels[0].UpColor.A : 255;
+                int opacityPercent = (int)(this.Opacity * 100);
+
+                using var dlg = new GlobalEditorForm(upInit, downInit, bgInit, currentBgPath, keyAlphaInit, opacityPercent);
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    foreach (var kp in _keyPanels)
                     {
-                        Text = kp.Key.ToString(),
-                        Dock = DockStyle.Fill,
-                        TextAlign = ContentAlignment.MiddleCenter,
-                        BackColor = Color.Transparent,
-                        ForeColor = GetContrastColor(picker.SelectedColor),
-                        Cursor = Cursors.SizeAll
-                    };
-                    lbl.MouseDown += (ls, le) => Panel_MouseDown(kp.Panel, le);
-                    lbl.MouseMove += (ls, le) => Panel_MouseMove(kp.Panel, le);
-                    lbl.MouseUp += (ls, le) => Panel_MouseUp(kp.Panel, le);
-                    lbl.ContextMenuStrip = _contextMenuStrip;
-                    kp.Panel.Controls.Add(lbl);*/
+                        kp.UpColor = dlg.SelectedUpColor;
+                        kp.DownColor = dlg.SelectedDownColor;
+                        kp.Panel.BackColor = kp.UpColor;
+                        kp.Panel.Invalidate(); // paint 기반 텍스트 갱신
+                    }
+
+                    this.BackColor = dlg.SelectedBgColor;
+                    _currentBgColor = dlg.SelectedBgColor;
+                    _currentBgImagePath = dlg.SelectedBgImagePath;
+
+                    try
+                    {
+                        this.BackgroundImage?.Dispose();
+                        if (!string.IsNullOrEmpty(_currentBgImagePath) && File.Exists(_currentBgImagePath))
+                        {
+                            var img = Image.FromFile(_currentBgImagePath);
+                            this.BackgroundImage = new Bitmap(img);
+                            this.BackgroundImageLayout = ImageLayout.Stretch;
+                        }
+                        else
+                        {
+                            this.BackgroundImage = null;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(this, $"이미지 적용 실패: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
             };
 
@@ -412,11 +414,76 @@ namespace keyviewer
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(layoutsItem);
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
-            _contextMenuStrip.Items.Add(saveLayoutItem); // 추가된 항목
+            _contextMenuStrip.Items.Add(saveLayoutItem);
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(addPanelItem);
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
+            _contextMenuStrip.Items.Add(setEditorItem);
+            _contextMenuStrip.Items.Add(new ToolStripSeparator());
+            _contextMenuStrip.Items.Add(globalSettingsItem);
+            _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(exitItem);
+        }
+
+        // 패널에 키 텍스트를 직접 그리도록 Paint 핸들러 연결
+        private void AttachKeyPaint(KeyPanel kp)
+        {
+            kp.Panel.Paint -= Panel_DrawKey; // 중복 등록 방지
+            kp.Panel.Paint += Panel_DrawKey;
+            kp.Panel.Resize -= Panel_Invalidate;
+            kp.Panel.Resize += Panel_Invalidate;
+            kp.Panel.Invalidate();
+        }
+
+        private void Panel_Invalidate(object? sender, EventArgs e)
+        {
+            if (sender is Control c) c.Invalidate();
+        }
+
+        private void Panel_DrawKey(object? sender, PaintEventArgs e)
+        {
+            if (sender is not Panel p) return;
+            // KeyPanel 찾기
+            var kp = _keyPanels.FirstOrDefault(x => x.Panel == p);
+            if (kp == null) return;
+
+            var rect = p.ClientRectangle;
+            using var sf = new System.Drawing.StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            using var brush = new SolidBrush(GetContrastColor(p.BackColor));
+            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            e.Graphics.DrawString(kp.Key.ToString(), this.Font, brush, rect, sf);
+        }
+
+        private KeyPanel? GetKeyPanelFromContext()
+        {
+            Control? src = _contextMenuStrip?.SourceControl;
+            if (src == null) return null;
+
+            Control? cur = src;
+            while (cur != null && !(cur is Panel))
+                cur = cur.Parent;
+            if (cur == null) return null;
+
+            var panel = cur as Panel;
+            foreach (var kp in _keyPanels)
+            {
+                if (kp.Panel == panel) return kp;
+            }
+            return null;
+        }
+
+        private void OpenPanelEditor(KeyPanel kp)
+        {
+            if (kp == null) return;
+            using var editor = new PanelEditorForm(kp.Key, kp.UpColor, kp.DownColor);
+            if (editor.ShowDialog(this) == DialogResult.OK)
+            {
+                kp.Key = editor.SelectedKey;
+                kp.UpColor = editor.SelectedUpColor;
+                kp.DownColor = editor.SelectedDownColor;
+                kp.Panel.BackColor = kp.UpColor;
+                kp.Panel.Invalidate();
+            }
         }
     }
 }

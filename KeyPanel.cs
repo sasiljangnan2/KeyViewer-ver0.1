@@ -6,9 +6,9 @@ namespace keyviewer
     public class KeyPanel
     {
         public Panel Panel { get; }
-        public Keys Key { get; }
-        public Color DownColor { get; }
-        public Color UpColor { get; }
+        public Keys Key { get; set; }
+        public Color DownColor { get; set; }
+        public Color UpColor { get; set; }
 
         public KeyPanel(Panel panel, Keys key, Color downColor, Color upColor)
         {

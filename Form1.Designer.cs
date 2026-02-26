@@ -38,9 +38,9 @@
             KeyPreview = true;
             Name = "Form1";
             Text = "dasd";
-            Load += Form1_Load;
-            KeyDown += Form1_KeyDown;
-            KeyUp += Form1_KeyUp;
+           // Load += Form1_Load;
+          //  KeyDown += Form1_KeyDown;
+           // KeyUp += Form1_KeyUp;
             ResumeLayout(false);
         }
 
