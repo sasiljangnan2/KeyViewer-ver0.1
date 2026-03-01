@@ -12,9 +12,7 @@ namespace keyviewer
             InitializeComponent();
         }
 
-        // -----------------------
         // 디자이너 안전 이벤트 핸들러
-        // -----------------------
         private void BtnUpColor_Click(object? sender, EventArgs e)
         {
             if (_colorDialog == null || _previewUp == null) return;
@@ -37,10 +35,8 @@ namespace keyviewer
                 _lblAlpha.Text = $"Alpha: {_tbAlpha.Value}";
         }
 
-        // 런타임에 콤보박스 항목을 채움(디자이너 모드면 생략)
         private void PanelEditorControl_Load(object? sender, EventArgs e)
         {
-            // DesignMode 체크: 디자이너에서 InitializeComponent가 호출될 때는 true여야 함.
             bool inDesigner = DesignMode || (LicenseManager.UsageMode == LicenseUsageMode.Designtime);
             if (inDesigner) return;
 
@@ -52,7 +48,6 @@ namespace keyviewer
                 _cbKeys.Items.Add(k);
             }
 
-            // 기존 SelectedKey 값이 있으면 선택, 없으면 0
             if (_cbKeys.Items.Count > 0)
             {
                 if (SelectedKey != Keys.None && _cbKeys.Items.Contains(SelectedKey))
@@ -67,9 +62,7 @@ namespace keyviewer
         private Color SafePreviewUp => _previewUp?.BackColor ?? Color.Gray;
         private Color SafePreviewDown => _previewDown?.BackColor ?? Color.Red;
 
-        // -----------------------
-        // 공개 속성 (디자이너 친화적)
-        // -----------------------
+        // 공개 속성
         [Browsable(true)]
         [Category("Behavior")]
         [Description("Selected key for the panel.")]
@@ -146,5 +139,41 @@ namespace keyviewer
                     _lblAlpha.Text = $"Alpha: {_tbAlpha?.Value ?? value}";
             }
         }
+
+        // 새로 추가: 패널 너비
+        [Browsable(true)]
+        [Category("Layout")]
+        [Description("Panel width in pixels.")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        [DefaultValue(85)]
+        public int SelectedWidth
+        {
+            get => _numWidth?.Value != null ? (int)_numWidth.Value : 85;
+            set
+            {
+                if (_numWidth != null)
+                    _numWidth.Value = Math.Clamp(value, (int)_numWidth.Minimum, (int)_numWidth.Maximum);
+            }
+        }
+
+        // 새로 추가: 패널 높이
+        [Browsable(true)]
+        [Category("Layout")]
+        [Description("Panel height in pixels.")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        [DefaultValue(85)]
+        public int SelectedHeight
+        {
+            get => _numHeight?.Value != null ? (int)_numHeight.Value : 85;
+            set
+            {
+                if (_numHeight != null)
+                    _numHeight.Value = Math.Clamp(value, (int)_numHeight.Minimum, (int)_numHeight.Maximum);
+            }
+        }
+
+        // 크기를 Size 타입으로 반환
+        [Browsable(false)]
+        public Size SelectedSize => new Size(SelectedWidth, SelectedHeight);
     }
 }

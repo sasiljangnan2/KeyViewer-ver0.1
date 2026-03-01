@@ -36,7 +36,7 @@ namespace keyviewer
                 var down = Color.FromArgb(cfg.DownArgb);
                 var up = Color.FromArgb(cfg.UpArgb);
                 var loc = new System.Drawing.Point(cfg.X, cfg.Y);
-                var size = new System.Drawing.Size(cfg.Width > 0 ? cfg.Width : 104, cfg.Height > 0 ? cfg.Height : 96);
+                var size = new System.Drawing.Size(cfg.Width > 0 ? cfg.Width : 85, cfg.Height > 0 ? cfg.Height : 85); // 80 -> 85·Î º¯°æ
                 var kp = panelService.AddKeyPanel(cfg.Key, down, up, loc, size);
                 created.Add(kp);
             }

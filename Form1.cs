@@ -95,6 +95,32 @@ namespace keyviewer
 
             // 폼 자체의 우클릭도 컨텍스트 메뉴가 뜨도록 연결
             this.ContextMenuStrip = _contextMenuStrip;
+
+            // 폼 이동/크기 변경 시 레이어드 윈도우 동기화
+            this.LocationChanged += (s, e) => SyncLayeredWindows();
+            this.SizeChanged += (s, e) => SyncLayeredWindows();
+            this.VisibleChanged += (s, e) => SyncLayeredWindowsVisibility();
+        }
+
+        // 레이어드 윈도우 위치 동기화
+        private void SyncLayeredWindows()
+        {
+            foreach (var kp in _keyPanels)
+            {
+                var screenLoc = this.PointToScreen(kp.Panel.Location);
+                kp.UpdatePosition(screenLoc);
+            }
+        }
+
+        private void SyncLayeredWindowsVisibility()
+        {
+            foreach (var kp in _keyPanels)
+            {
+                if (this.Visible)
+                    kp.Show();
+                else
+                    kp.Hide();
+            }
         }
 
         // 레이아웃 목록 로드
@@ -168,6 +194,7 @@ namespace keyviewer
 
             foreach (var kp in runtime)
             {
+                kp.Dispose(); // 레이어드 윈도우 해제
                 if (kp.Panel.Parent != null)
                     Controls.Remove(kp.Panel);
                 _keyPanels.Remove(kp);
@@ -176,12 +203,18 @@ namespace keyviewer
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
-            // 폼 종료 시 후크 해제
             if (_hookID != IntPtr.Zero)
             {
                 UnhookWindowsHookEx(_hookID);
                 _hookID = IntPtr.Zero;
             }
+
+            // 모든 레이어드 윈도우 해제
+            foreach (var kp in _keyPanels)
+            {
+                kp.Dispose();
+            }
+
             base.OnFormClosed(e);
         }
 
@@ -231,79 +264,34 @@ namespace keyviewer
             }
         }
 
-        // --- 마우스 드래그 핸들러 ---
-        private void Panel_MouseDown(object? sender, MouseEventArgs e)
-        {
-            // 우클릭: 컨텍스트 메뉴 표시
-            if (e.Button == MouseButtons.Right)
-            {
-                if (sender is Control ctrl)
-                {
-                    _contextMenuStrip?.Show(ctrl, e.Location);
-                }
-                return;
-            }
+        // 더미 패널용 드래그 핸들러 (레이어드 윈도우가 대신 처리하므로 사용 안 함)
+        private void Panel_MouseDown(object? sender, MouseEventArgs e) { }
+        private void Panel_MouseMove(object? sender, MouseEventArgs e) { }
+        private void Panel_MouseUp(object? sender, MouseEventArgs e) { }
 
-            if (e.Button != MouseButtons.Left) return;
-            if (sender is Control c)
-            {
-                _draggedControl = c;
-                _dragging = true;
-                _dragStartMouse = Control.MousePosition;
-                _dragStartLocation = c.Location;
-                c.Capture = true;
-            }
-        }
-
-        private void Panel_MouseMove(object? sender, MouseEventArgs e)
-        {
-            if (!_dragging || _draggedControl == null) return;
-
-            Point currentMouse = Control.MousePosition;
-            int dx = currentMouse.X - _dragStartMouse.X;
-            int dy = currentMouse.Y - _dragStartMouse.Y;
-            Point desired = new Point(_dragStartLocation.X + dx, _dragStartLocation.Y + dy);
-
-            int maxX = ClientSize.Width - _draggedControl.Width;
-            int maxY = ClientSize.Height - _draggedControl.Height;
-            int clampedX = Math.Max(0, Math.Min(desired.X, maxX));
-            int clampedY = Math.Max(0, Math.Min(desired.Y, maxY));
-            clampedX -= clampedX % 10;
-            clampedY -= clampedY % 10;
-            _draggedControl.Location = new Point(clampedX, clampedY);
-        }
-
-        private void Panel_MouseUp(object? sender, MouseEventArgs e)
-        {
-            if (e.Button != MouseButtons.Left) return;
-            if (_draggedControl != null)
-            {
-                _draggedControl.Capture = false;
-                _draggedControl = null;
-            }
-            _dragging = false;
-        }
-
-        // 간단한 대비 색 반환(전경색 자동 선택)
         private Color GetContrastColor(Color bg)
         {
-            // YIQ 밝기 공식
             int yiq = ((bg.R * 299) + (bg.G * 587) + (bg.B * 114)) / 1000;
             return yiq >= 128 ? Color.Black : Color.White;
         }
 
-        // 컨택스트 매뉴 및 Global Settings 등 기존 코드 유지
         private void InitializeContextMenu()
         {
-            // 클릭 시점의 마우스 위치를 폼 좌표로 계산 — 이전에는 초기화 시점에만 계산되어 문제가 있었습니다.
-           
-
             _contextMenuStrip = new ContextMenuStrip();
 
             var toggleTopMost = new ToolStripMenuItem("Always on Top");
             toggleTopMost.CheckOnClick = true;
             toggleTopMost.Checked = this.TopMost;
-            toggleTopMost.Click += (s, e) => this.TopMost = toggleTopMost.Checked;
+            toggleTopMost.Click += (s, e) =>
+            {
+                this.TopMost = toggleTopMost.Checked;
+                // 레이어드 윈도우도 TopMost 동기화
+                foreach (var kp in _keyPanels)
+                {
+                    if (kp.LayeredWindow != null && !kp.LayeredWindow.IsDisposed)
+                        kp.LayeredWindow.TopMost = this.TopMost;
+                }
+            };
 
             var layoutsItem = new ToolStripMenuItem("Layouts...");
             layoutsItem.Click += (s, e) =>
@@ -320,9 +308,8 @@ namespace keyviewer
                     var created = LayoutManager.ApplyLayout(layout, _panelService);
                     foreach (var kp in created)
                     {
-                        // 패널에 paint 기반 키 그리기 핸들러를 등록
-                        AttachKeyPaint(kp);
                         kp.Panel.ContextMenuStrip = _contextMenuStrip;
+                        kp.UpdateVisual();
                     }
                 }
             };
@@ -336,22 +323,20 @@ namespace keyviewer
                 Point loc = PointToClient(Cursor.Position);
                 loc.X -= loc.X % 10;
                 loc.Y -= loc.Y % 10;
-                int w = 85, h = 85;
-                loc.X = Math.Clamp(loc.X, 0, Math.Max(0, ClientSize.Width - w));
-                loc.Y = Math.Clamp(loc.Y, 0, Math.Max(0, ClientSize.Height - h));
 
                 using var editor = new PanelEditorForm();
                 if (editor.ShowDialog(this) == DialogResult.OK)
                 {
                     var up = editor.SelectedUpColor;
                     var down = editor.SelectedDownColor;
-                    var kp = _panelService.AddKeyPanel(editor.SelectedKey, down, up, loc, new Size(w, h));
-                    kp.Panel.ContextMenuStrip = _contextMenuStrip;
-                    kp.Panel.BackColor = kp.UpColor;
+                    var size = editor.SelectedSize; // 사용자가 입력한 크기 사용
+                    
+                    // 폼 내부로 클램프
+                    loc.X = Math.Clamp(loc.X, 0, Math.Max(0, ClientSize.Width - size.Width));
+                    loc.Y = Math.Clamp(loc.Y, 0, Math.Max(0, ClientSize.Height - size.Height));
 
-                    // 패널 내부에 별도 라벨을 추가하지 않고, Paint로 키를 그리도록 등록
-                    AttachKeyPaint(kp);
-                    kp.Panel.BringToFront();
+                    var kp = _panelService.AddKeyPanel(editor.SelectedKey, down, up, loc, size);
+                    kp.BringToFront();
                 }
             };
 
@@ -387,7 +372,7 @@ namespace keyviewer
                         kp.UpColor = Color.FromArgb(finalAlpha, dlg.SelectedUpColor);
                         kp.DownColor = Color.FromArgb(finalAlpha, dlg.SelectedDownColor);
                         kp.Panel.BackColor = kp.UpColor;
-                        kp.Panel.Invalidate();
+                        kp.UpdateVisual(); // 레이어드 윈도우 갱신
                     }
 
                     this.BackColor = dlg.SelectedBgColor;
@@ -445,60 +430,25 @@ namespace keyviewer
             _contextMenuStrip.Items.Add(exitItem);
         }
 
-        // 패널에 키 텍스트를 직접 그리도록 Paint 핸들러 연결
-        private void AttachKeyPaint(KeyPanel kp)
-        {
-            kp.Panel.Paint -= Panel_DrawKey; // 중복 등록 방지
-            kp.Panel.Paint += Panel_DrawKey;
-            kp.Panel.Resize -= Panel_Invalidate;
-            kp.Panel.Resize += Panel_Invalidate;
-            kp.Panel.Invalidate();
-        }
-
-        private void Panel_Invalidate(object? sender, EventArgs e)
-        {
-            if (sender is Control c) c.Invalidate();
-        }
-
-        private void Panel_DrawKey(object? sender, PaintEventArgs e)
-        {
-            if (sender is not Panel p) return;
-            // KeyPanel 찾기
-            var kp = _keyPanels.FirstOrDefault(x => x.Panel == p);
-            if (kp == null) return;
-
-            var rect = p.ClientRectangle;
-            
-            // 먼저 패널 색을 불투명하게 그리기 (TransparencyKey 색이 비치지 않도록)
-            // BackColor에 알파가 있어도 GDI+로 불투명하게 먼저 칠함
-            using (var bgBrush = new SolidBrush(Color.FromArgb(255, p.BackColor)))
-            {
-                e.Graphics.FillRectangle(bgBrush, rect);
-            }
-
-            // 그 위에 텍스트 그리기
-            using var sf = new System.Drawing.StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            using var brush = new SolidBrush(GetContrastColor(Color.FromArgb(255, p.BackColor)));
-            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-            e.Graphics.DrawString(kp.Key.ToString(), this.Font, brush, rect, sf);
-        }
-
         private KeyPanel? GetKeyPanelFromContext()
         {
             Control? src = _contextMenuStrip?.SourceControl;
-            if (src == null) return null;
+            
+            // 레이어드 윈도우에서 우클릭한 경우
+            if (src is Form layered)
+            {
+                return _keyPanels.FirstOrDefault(kp => kp.LayeredWindow == layered);
+            }
 
+            // 더미 패널에서 우클릭한 경우
+            if (src == null) return null;
             Control? cur = src;
             while (cur != null && !(cur is Panel))
                 cur = cur.Parent;
             if (cur == null) return null;
 
             var panel = cur as Panel;
-            foreach (var kp in _keyPanels)
-            {
-                if (kp.Panel == panel) return kp;
-            }
-            return null;
+            return _keyPanels.FirstOrDefault(kp => kp.Panel == panel);
         }
 
         private void OpenPanelEditor(KeyPanel kp)
@@ -511,7 +461,16 @@ namespace keyviewer
                 kp.UpColor = editor.SelectedUpColor;
                 kp.DownColor = editor.SelectedDownColor;
                 kp.Panel.BackColor = kp.UpColor;
-                kp.Panel.Invalidate();
+                
+                // 크기 변경 지원 (사용자가 수정한 경우)
+                var newSize = editor.SelectedSize;
+                if (kp.Panel.Size != newSize)
+                {
+                    kp.Panel.Size = newSize;
+                    kp.UpdateSize(newSize);
+                }
+                
+                kp.UpdateVisual(); // 레이어드 윈도우 갱신
             }
         }
     }

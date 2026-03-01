@@ -30,7 +30,6 @@ namespace keyviewer
             _contextMenu = contextMenu;
         }
 
-        // 디자이너에서 만든 기존 Panel을 KeyPanel로 래핑하고 이벤트/컨텍스트 연결
         public KeyPanel WrapExistingPanel(Panel panel, Keys key, Color downColor, Color upColor)
         {
             if (panel == null) throw new ArgumentNullException(nameof(panel));
@@ -39,65 +38,135 @@ namespace keyviewer
 
             var kp = new KeyPanel(panel, key, downColor, upColor);
             KeyPanels.Add(kp);
+            AttachLayeredWindowHandlers(kp); // 레이어드 윈도우 핸들러 연결
             return kp;
         }
 
-        // 런타임에서 새 Panel을 생성하고 KeyPanel로 추가
         public KeyPanel AddKeyPanel(Keys key, Color downColor, Color upColor, Point location, Size? size = null)
         {
-            Size panelSize = size ?? new Size(104, 96);
+            Size panelSize = size ?? new Size(85, 85); // 기본 크기를 85x85로 변경
             string nameBase = "panel";
             int idx = 1;
             while (_form.Controls.Find(nameBase + idx, false).Length > 0) idx++;
             string name = nameBase + idx;
 
+            // 더미 패널(위치/크기 저장용, 숨김)
             var panel = new Panel
             {
                 BackColor = _defaultColor,
                 Location = location,
                 Name = name,
                 Size = panelSize,
-                TabIndex = _form.Controls.Count
+                TabIndex = _form.Controls.Count,
+                Visible = false // 레이어드 윈도우가 대신 표시됨
             };
 
-            // 일관된 설정 적용(컨텍스트, 마우스 핸들러, ControlAdded 구독)
             ApplyContextAndHandlersRecursive(panel);
-
             _form.Controls.Add(panel);
 
             var kp = new KeyPanel(panel, key, downColor, upColor);
             KeyPanels.Add(kp);
+            
+            // 레이어드 윈도우에 마우스 핸들러 연결
+            AttachLayeredWindowHandlers(kp);
+            
             return kp;
         }
 
-        // 컨텍스트 메뉴를 나중에 변경할 때 기존 패널들에 적용
+        // 레이어드 윈도우에 드래그/우클릭 핸들러 연결
+        private void AttachLayeredWindowHandlers(KeyPanel kp)
+        {
+            if (kp.LayeredWindow == null) return;
+
+            // 드래그 지원: 레이어드 윈도우를 드래그하면 더미 패널 위치도 업데이트
+            Point dragStart = Point.Empty;
+            Point locStart = Point.Empty;
+            bool dragging = false;
+
+            kp.LayeredWindow.MouseDown += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Right)
+                {
+                    _contextMenu?.Show(kp.LayeredWindow, e.Location);
+                    return;
+                }
+                if (e.Button == MouseButtons.Left)
+                {
+                    dragging = true;
+                    dragStart = Control.MousePosition;
+                    locStart = kp.LayeredWindow.Location;
+                    kp.LayeredWindow.Capture = true;
+                }
+            };
+
+            kp.LayeredWindow.MouseMove += (s, e) =>
+            {
+                if (!dragging) return;
+                Point current = Control.MousePosition;
+                int dx = current.X - dragStart.X;
+                int dy = current.Y - dragStart.Y;
+                Point newLoc = new Point(locStart.X + dx, locStart.Y + dy);
+                
+                // 그리드 스냅 (10px)
+                newLoc.X -= newLoc.X % 10;
+                newLoc.Y -= newLoc.Y % 10;
+
+                // 폼 경계 내로 제한 (화면 좌표)
+                if (kp.Panel.Parent != null)
+                {
+                    var formScreenBounds = new Rectangle(
+                        _form.PointToScreen(Point.Empty),
+                        _form.ClientSize
+                    );
+
+                    int maxX = formScreenBounds.Right - kp.LayeredWindow.Width;
+                    int maxY = formScreenBounds.Bottom - kp.LayeredWindow.Height;
+                    
+                    newLoc.X = Math.Clamp(newLoc.X, formScreenBounds.Left, maxX);
+                    newLoc.Y = Math.Clamp(newLoc.Y, formScreenBounds.Top, maxY);
+                }
+
+                kp.LayeredWindow.Location = newLoc;
+                
+                // 더미 패널 위치 업데이트 (폼 좌표)
+                if (kp.Panel.Parent != null)
+                {
+                    kp.Panel.Location = kp.Panel.Parent.PointToClient(newLoc);
+                }
+            };
+
+            kp.LayeredWindow.MouseUp += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    kp.LayeredWindow.Capture = false;
+                    dragging = false;
+                }
+            };
+
+            kp.LayeredWindow.ContextMenuStrip = _contextMenu;
+        }
+
         public void SetContextMenu(ContextMenuStrip? contextMenu)
         {
             _contextMenu = contextMenu;
             foreach (var kp in KeyPanels)
             {
                 kp.Panel.ContextMenuStrip = _contextMenu;
-                foreach (Control child in kp.Panel.Controls)
-                {
-                    child.ContextMenuStrip = _contextMenu;
-                }
+                if (kp.LayeredWindow != null)
+                    kp.LayeredWindow.ContextMenuStrip = _contextMenu;
             }
         }
 
-        // 패널 및 자식 컨트롤에 일관된 설정을 적용하고 ControlAdded를 통해
-        // 런타임에 추가되는 자식에도 동일 동작 적용
         private void ApplyContextAndHandlersRecursive(Control ctl)
         {
             if (_contextMenu != null)
                 ctl.ContextMenuStrip = _contextMenu;
 
             AttachMouseHandlers(ctl);
-
-            // ControlAdded 구독: 자식이 추가되면 자동으로 동일 설정 적용
             ctl.ControlAdded -= OnControlAdded;
             ctl.ControlAdded += OnControlAdded;
 
-            // 이미 있는 자식들에도 적용
             foreach (Control child in ctl.Controls)
             {
                 if (_contextMenu != null)
@@ -112,8 +181,6 @@ namespace keyviewer
             if (_contextMenu != null)
                 e.Control.ContextMenuStrip = _contextMenu;
             AttachMouseHandlers(e.Control);
-
-            // 재귀 구독 (자식의 자식에도 적용되도록)
             e.Control.ControlAdded -= OnControlAdded;
             e.Control.ControlAdded += OnControlAdded;
         }
@@ -122,7 +189,7 @@ namespace keyviewer
         {
             if (_mouseDown != null)
             {
-                c.MouseDown -= _mouseDown; // 중복 구독 방지
+                c.MouseDown -= _mouseDown;
                 c.MouseDown += _mouseDown;
             }
             if (_mouseMove != null)

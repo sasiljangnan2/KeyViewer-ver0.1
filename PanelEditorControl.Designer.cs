@@ -13,6 +13,10 @@ namespace keyviewer
         private Panel _previewDown;
         private TrackBar _tbAlpha;
         private Label _lblAlpha;
+        private NumericUpDown _numWidth;
+        private NumericUpDown _numHeight;
+        private Label _lblWidth;
+        private Label _lblHeight;
         private ColorDialog _colorDialog;
 
         private void InitializeComponent()
@@ -24,9 +28,13 @@ namespace keyviewer
             _previewDown = new Panel();
             _tbAlpha = new TrackBar();
             _lblAlpha = new Label();
+            _numWidth = new NumericUpDown();
+            _numHeight = new NumericUpDown();
+            _lblWidth = new Label();
+            _lblHeight = new Label();
             _colorDialog = new ColorDialog();
 
-            // cbKeys - 디자이너에서는 항목 추가하지 않음 (런타임에 채움)
+            // cbKeys
             _cbKeys.Left = 8;
             _cbKeys.Top = 8;
             _cbKeys.Width = 320;
@@ -70,20 +78,57 @@ namespace keyviewer
             _tbAlpha.Value = 255;
             _tbAlpha.Scroll += TbAlpha_Scroll;
 
-            // lblAlpha (디자이너 초기값은 리터럴)
+            // lblAlpha
             _lblAlpha.Left = 336;
             _lblAlpha.Top = 124;
             _lblAlpha.Width = 120;
             _lblAlpha.Text = "Alpha: 255";
 
-            // Load 이벤트 - 런타임에 콤보박스 항목을 채우도록 함
+            // lblWidth
+            _lblWidth.Left = 8;
+            _lblWidth.Top = 164;
+            _lblWidth.Width = 60;
+            _lblWidth.Text = "Width:";
+            _lblWidth.TextAlign = ContentAlignment.MiddleLeft;
+
+            // numWidth
+            _numWidth.Left = 70;
+            _numWidth.Top = 164;
+            _numWidth.Width = 80;
+            _numWidth.Minimum = 20;
+            _numWidth.Maximum = 500;
+            _numWidth.Value = 85; // 기본값 85
+
+            // lblHeight
+            _lblHeight.Left = 200;
+            _lblHeight.Top = 164;
+            _lblHeight.Width = 60;
+            _lblHeight.Text = "Height:";
+            _lblHeight.TextAlign = ContentAlignment.MiddleLeft;
+
+            // numHeight
+            _numHeight.Left = 262;
+            _numHeight.Top = 164;
+            _numHeight.Width = 80;
+            _numHeight.Minimum = 20;
+            _numHeight.Maximum = 500;
+            _numHeight.Value = 85; // 기본값 85
+
+            // Load 이벤트
             this.Load += PanelEditorControl_Load;
 
             // Control collection
-            Controls.AddRange(new Control[] { _cbKeys, _btnUpColor, _previewUp, _btnDownColor, _previewDown, _tbAlpha, _lblAlpha });
+            Controls.AddRange(new Control[] { 
+                _cbKeys, 
+                _btnUpColor, _previewUp, 
+                _btnDownColor, _previewDown, 
+                _tbAlpha, _lblAlpha,
+                _lblWidth, _numWidth,
+                _lblHeight, _numHeight
+            });
 
             Width = 480;
-            Height = 164;
+            Height = 204; // 높이 증가 (크기 입력 필드 추가)
         }
     }
 }

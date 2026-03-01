@@ -38,7 +38,7 @@ namespace keyviewer
             _editor.SelectedOpacityPercent = initialOpacityPercent;
             _editor.BackgroundTransparent = initialTransparent; // 새 초기값
 
-            ClientSize = new Size(Math.Max(520, _editor.Width), _editor.Height + 56);
+            ClientSize = new Size(Math.Max(520, _editor.Width), _editor.Height);
             AcceptButton = _btnOk;
             CancelButton = _btnCancel;
         }
