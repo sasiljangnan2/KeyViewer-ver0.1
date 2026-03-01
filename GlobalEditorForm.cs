@@ -16,19 +16,25 @@ namespace keyviewer
         public Color SelectedBgColor => _editor.SelectedBgColor;
         public string? SelectedBgImagePath => _editor.SelectedBgImagePath;
         public int SelectedOpacityPercent => _editor.SelectedOpacityPercent;
-        public bool BackgroundTransparent => _editor.BackgroundTransparent; // 새 속성
+        public bool BackgroundTransparent => _editor.BackgroundTransparent;
 
         public GlobalEditorForm(Color initialUp, Color initialDown, Color initialBg, string? initialBgImagePath, int initialKeyAlpha, int initialOpacityPercent, bool initialTransparent = false)
         {
             InitializeComponent();
 
-            _editor = new GlobalEditorControl { Dock = DockStyle.Top };
-            _btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Dock = DockStyle.Bottom };
-            _btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Dock = DockStyle.Bottom };
+            _editor = new GlobalEditorControl { Dock = DockStyle.Fill }; // Top 대신 Fill 사용
+            
+            // 버튼 패널 생성 (Dock = Bottom)
+            var buttonPanel = new Panel { Dock = DockStyle.Bottom, Height = 35 };
+            _btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Width = 75, Height = 28, Left = 10, Top = 4 };
+            _btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Width = 75, Height = 28, Left = 95, Top = 4 };
+            
+            buttonPanel.Controls.Add(_btnOk);
+            buttonPanel.Controls.Add(_btnCancel);
 
+            // 추가 순서 중요: Bottom이 먼저, 그 다음 Fill
+            Controls.Add(buttonPanel);
             Controls.Add(_editor);
-            Controls.Add(_btnCancel);
-            Controls.Add(_btnOk);
 
             // 초기값 전달
             _editor.SelectedUpColor = initialUp;
@@ -36,17 +42,24 @@ namespace keyviewer
             _editor.SelectedBgColor = initialBg;
             _editor.SelectedKeyAlpha = initialKeyAlpha;
             _editor.SelectedOpacityPercent = initialOpacityPercent;
-            _editor.BackgroundTransparent = initialTransparent; // 새 초기값
+            _editor.BackgroundTransparent = initialTransparent;
 
-            ClientSize = new Size(Math.Max(520, _editor.Width), _editor.Height);
+            ClientSize = new Size(Math.Max(520, _editor.Width), 280 + 35); // 280(editor) + 35(buttons)
             AcceptButton = _btnOk;
             CancelButton = _btnCancel;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            StartPosition = FormStartPosition.CenterParent;
+            Text = "Global Settings";
         }
 
         private void InitializeComponent()
         {
-            // 필요하면 여기에 디자이너 초기화 코드를 추가하거나
-            // Partial class로 .Designer.cs 파일을 생성하여 UI 초기화를 분리하세요.
+            SuspendLayout();
+            ClientSize = new Size(520, 315);
+            Name = "GlobalEditorForm";
+            ResumeLayout(false);
         }
     }
 }
