@@ -52,6 +52,8 @@ namespace keyviewer
         // 현재 배경 이미지 경로 (선택적으로 저장) 및 배경 색
         private string? _currentBgImagePath = null;
         private Color _currentBgColor;
+        private bool _backgroundTransparent = false; // 배경 투명화 상태
+        private readonly Color _transparencyKeyColor = Color.Magenta; // TransparencyKey 색
 
         // P/Invoke: 키보드 훅 관련 (필요)
         [DllImport("user32.dll", SetLastError = true)]
@@ -374,38 +376,56 @@ namespace keyviewer
                 int keyAlphaInit = _keyPanels.Count > 0 ? _keyPanels[0].UpColor.A : 255;
                 int opacityPercent = (int)(this.Opacity * 100);
 
-                using var dlg = new GlobalEditorForm(upInit, downInit, bgInit, currentBgPath, keyAlphaInit, opacityPercent);
+                using var dlg = new GlobalEditorForm(upInit, downInit, bgInit, currentBgPath, keyAlphaInit, opacityPercent, _backgroundTransparent);
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
+                    // 배경 투명화 모드: 키 알파를 강제로 255로 설정 (마젠타가 비치지 않도록)
+                    int finalAlpha = dlg.BackgroundTransparent ? 255 : dlg.SelectedUpColor.A;
+
                     foreach (var kp in _keyPanels)
                     {
-                        kp.UpColor = dlg.SelectedUpColor;
-                        kp.DownColor = dlg.SelectedDownColor;
+                        kp.UpColor = Color.FromArgb(finalAlpha, dlg.SelectedUpColor);
+                        kp.DownColor = Color.FromArgb(finalAlpha, dlg.SelectedDownColor);
                         kp.Panel.BackColor = kp.UpColor;
-                        kp.Panel.Invalidate(); // paint 기반 텍스트 갱신
+                        kp.Panel.Invalidate();
                     }
 
                     this.BackColor = dlg.SelectedBgColor;
                     _currentBgColor = dlg.SelectedBgColor;
                     _currentBgImagePath = dlg.SelectedBgImagePath;
+                    _backgroundTransparent = dlg.BackgroundTransparent;
 
-                    try
+                    // 배경 투명화 적용
+                    if (_backgroundTransparent)
                     {
                         this.BackgroundImage?.Dispose();
-                        if (!string.IsNullOrEmpty(_currentBgImagePath) && File.Exists(_currentBgImagePath))
-                        {
-                            var img = Image.FromFile(_currentBgImagePath);
-                            this.BackgroundImage = new Bitmap(img);
-                            this.BackgroundImageLayout = ImageLayout.Stretch;
-                        }
-                        else
-                        {
-                            this.BackgroundImage = null;
-                        }
+                        this.BackgroundImage = null;
+                        this.BackColor = _transparencyKeyColor;
+                        this.TransparencyKey = _transparencyKeyColor;
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        MessageBox.Show(this, $"이미지 적용 실패: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        this.TransparencyKey = Color.Empty;
+                        this.BackColor = _currentBgColor;
+
+                        try
+                        {
+                            this.BackgroundImage?.Dispose();
+                            if (!string.IsNullOrEmpty(_currentBgImagePath) && File.Exists(_currentBgImagePath))
+                            {
+                                var img = Image.FromFile(_currentBgImagePath);
+                                this.BackgroundImage = new Bitmap(img);
+                                this.BackgroundImageLayout = ImageLayout.Stretch;
+                            }
+                            else
+                            {
+                                this.BackgroundImage = null;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show(this, $"이미지 적용 실패: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
                     }
                 }
             };
@@ -448,8 +468,17 @@ namespace keyviewer
             if (kp == null) return;
 
             var rect = p.ClientRectangle;
+            
+            // 먼저 패널 색을 불투명하게 그리기 (TransparencyKey 색이 비치지 않도록)
+            // BackColor에 알파가 있어도 GDI+로 불투명하게 먼저 칠함
+            using (var bgBrush = new SolidBrush(Color.FromArgb(255, p.BackColor)))
+            {
+                e.Graphics.FillRectangle(bgBrush, rect);
+            }
+
+            // 그 위에 텍스트 그리기
             using var sf = new System.Drawing.StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            using var brush = new SolidBrush(GetContrastColor(p.BackColor));
+            using var brush = new SolidBrush(GetContrastColor(Color.FromArgb(255, p.BackColor)));
             e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             e.Graphics.DrawString(kp.Key.ToString(), this.Font, brush, rect, sf);
         }

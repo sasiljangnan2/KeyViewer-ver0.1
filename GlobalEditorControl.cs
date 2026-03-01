@@ -60,6 +60,11 @@ namespace keyviewer
                 _lblWindowOpacity.Text = $"Background Alpha: {_tbWindowOpacity.Value}";
         }
 
+        private void ChkTransparentBg_CheckedChanged(object? sender, EventArgs e)
+        {
+            // 체크박스 상태가 변경될 때 아무것도 안 함 (Form1에서 읽기만 함)
+        }
+
         // 기존 속성들 (안전한 null 처리 포함)
         private int SafeKeyAlpha => _tbKeyAlpha?.Value ?? 255;
         private Color SafePreviewUpColor => _previewUp?.BackColor ?? Color.Gray;
@@ -200,5 +205,21 @@ namespace keyviewer
         }
 
         public string? SelectedBgImagePath { get; private set; }
+
+        // 새: 배경 완전 투명화 여부
+        [Browsable(true)]
+        [Category("Appearance")]
+        [Description("Enable background transparency (using TransparencyKey).")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        [DefaultValue(false)]
+        public bool BackgroundTransparent
+        {
+            get => _chkTransparentBg?.Checked ?? false;
+            set
+            {
+                if (_chkTransparentBg != null)
+                    _chkTransparentBg.Checked = value;
+            }
+        }
     }
 }

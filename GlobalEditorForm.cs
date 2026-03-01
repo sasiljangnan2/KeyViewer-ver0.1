@@ -4,7 +4,7 @@ using System.Windows.Forms;
 
 namespace keyviewer
 {
-        public partial class GlobalEditorForm : Form
+    public partial class GlobalEditorForm : Form
     {
         private readonly GlobalEditorControl _editor;
         private readonly Button _btnOk;
@@ -16,8 +16,9 @@ namespace keyviewer
         public Color SelectedBgColor => _editor.SelectedBgColor;
         public string? SelectedBgImagePath => _editor.SelectedBgImagePath;
         public int SelectedOpacityPercent => _editor.SelectedOpacityPercent;
+        public bool BackgroundTransparent => _editor.BackgroundTransparent; // 새 속성
 
-        public GlobalEditorForm(Color initialUp, Color initialDown, Color initialBg, string? initialBgImagePath, int initialKeyAlpha, int initialOpacityPercent)
+        public GlobalEditorForm(Color initialUp, Color initialDown, Color initialBg, string? initialBgImagePath, int initialKeyAlpha, int initialOpacityPercent, bool initialTransparent = false)
         {
             InitializeComponent();
 
@@ -35,12 +36,13 @@ namespace keyviewer
             _editor.SelectedBgColor = initialBg;
             _editor.SelectedKeyAlpha = initialKeyAlpha;
             _editor.SelectedOpacityPercent = initialOpacityPercent;
+            _editor.BackgroundTransparent = initialTransparent; // 새 초기값
 
             ClientSize = new Size(Math.Max(520, _editor.Width), _editor.Height + 56);
             AcceptButton = _btnOk;
             CancelButton = _btnCancel;
         }
-        // 간단한 no-op InitializeComponent: 디자이너가 없는 호스트 폼에서 빈 구현으로 에러 방지
+
         private void InitializeComponent()
         {
             // 필요하면 여기에 디자이너 초기화 코드를 추가하거나
