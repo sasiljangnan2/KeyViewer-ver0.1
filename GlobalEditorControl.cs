@@ -13,7 +13,6 @@ namespace keyviewer
             InitializeComponent();
         }
 
-        // 이벤트 핸들러: 디자이너에서 안전하게 참조되는 명명된 메서드로 구현
         private void BtnUpColor_Click(object? sender, EventArgs e)
         {
             if (_colorDialog == null || _previewUp == null) return;
@@ -57,7 +56,10 @@ namespace keyviewer
         private void TbWindowOpacity_Scroll(object? sender, EventArgs e)
         {
             if (_lblWindowOpacity != null && _tbWindowOpacity != null)
-                _lblWindowOpacity.Text = $"Background Alpha: {_tbWindowOpacity.Value}";
+            {
+                int percent = (int)Math.Round(_tbWindowOpacity.Value * 100.0 / 255.0);
+                _lblWindowOpacity.Text = $"Window Opacity: {percent}%"; // 변경
+            }
         }
 
         private void ChkTransparentBg_CheckedChanged(object? sender, EventArgs e)
@@ -146,28 +148,9 @@ namespace keyviewer
             }
         }
 
-        // 새: 배경 알파 (0..255)
         [Browsable(true)]
         [Category("Appearance")]
-        [Description("Background alpha (0-255).")]
-        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-        [DefaultValue(255)]
-        public int SelectedBgAlpha
-        {
-            get => _tbWindowOpacity?.Value ?? 255;
-            set
-            {
-                if (_tbWindowOpacity != null)
-                    _tbWindowOpacity.Value = Math.Clamp(value, _tbWindowOpacity.Minimum, _tbWindowOpacity.Maximum);
-                if (_lblWindowOpacity != null)
-                    _lblWindowOpacity.Text = $"Background Alpha: {_tbWindowOpacity?.Value ?? value}";
-            }
-        }
-
-        // 새: 배경 불투명도(백분율 0..100) — GlobalEditorForm에서 사용
-        [Browsable(true)]
-        [Category("Appearance")]
-        [Description("Background opacity percent (0-100).")]
+        [Description("Window opacity percent (0-100).")]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         [DefaultValue(100)]
         public int SelectedOpacityPercent
@@ -184,7 +167,7 @@ namespace keyviewer
                 if (_tbWindowOpacity != null)
                     _tbWindowOpacity.Value = Math.Clamp(alpha, _tbWindowOpacity.Minimum, _tbWindowOpacity.Maximum);
                 if (_lblWindowOpacity != null)
-                    _lblWindowOpacity.Text = $"Background Alpha: {_tbWindowOpacity?.Value ?? alpha}";
+                    _lblWindowOpacity.Text = $"Window Opacity: {percent}%"; // 변경
             }
         }
 
@@ -206,7 +189,6 @@ namespace keyviewer
 
         public string? SelectedBgImagePath { get; private set; }
 
-        // 새: 배경 완전 투명화 여부
         [Browsable(true)]
         [Category("Appearance")]
         [Description("Enable background transparency (using TransparencyKey).")]
@@ -219,6 +201,42 @@ namespace keyviewer
             {
                 if (_chkTransparentBg != null)
                     _chkTransparentBg.Checked = value;
+            }
+        }
+
+        [Browsable(true)]
+        [Category("Appearance")]
+        [Description("Chroma key color for OBS transparency.")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)] // 추가
+        public Color ChromaKeyColor
+        {
+            get
+            {
+                if (_cboChromaKey == null) return Color.Magenta;
+
+                return _cboChromaKey.SelectedIndex switch
+                {
+                    0 => Color.FromArgb(255, 0, 255),   // Magenta
+                    1 => Color.FromArgb(0, 255, 0),     // Green
+                    2 => Color.FromArgb(0, 0, 255),     // Blue
+                    3 => Color.FromArgb(0, 0, 0),       // Black
+                    _ => Color.Magenta
+                };
+            }
+            set
+            {
+                if (_cboChromaKey == null) return;
+
+                if (value.R == 255 && value.G == 0 && value.B == 255)
+                    _cboChromaKey.SelectedIndex = 0; // Magenta
+                else if (value.R == 0 && value.G == 255 && value.B == 0)
+                    _cboChromaKey.SelectedIndex = 1; // Green
+                else if (value.R == 0 && value.G == 0 && value.B == 255)
+                    _cboChromaKey.SelectedIndex = 2; // Blue
+                else if (value.R == 0 && value.G == 0 && value.B == 0)
+                    _cboChromaKey.SelectedIndex = 3; // Black
+                else
+                    _cboChromaKey.SelectedIndex = 0; // 기본값
             }
         }
     }

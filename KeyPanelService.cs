@@ -13,6 +13,7 @@ namespace keyviewer
         private readonly MouseEventHandler? _mouseMove;
         private readonly MouseEventHandler? _mouseUp;
         private ContextMenuStrip? _contextMenu;
+        private bool _obsCompatibilityMode;
 
         public List<KeyPanel> KeyPanels { get; } = new List<KeyPanel>();
 
@@ -20,7 +21,8 @@ namespace keyviewer
             MouseEventHandler? mouseDown = null,
             MouseEventHandler? mouseMove = null,
             MouseEventHandler? mouseUp = null,
-            ContextMenuStrip? contextMenu = null)
+            ContextMenuStrip? contextMenu = null,
+            bool obsCompatibilityMode = false)
         {
             _form = form ?? throw new ArgumentNullException(nameof(form));
             _defaultColor = defaultColor;
@@ -28,6 +30,7 @@ namespace keyviewer
             _mouseMove = mouseMove;
             _mouseUp = mouseUp;
             _contextMenu = contextMenu;
+            _obsCompatibilityMode = obsCompatibilityMode;
         }
 
         public KeyPanel WrapExistingPanel(Panel panel, Keys key, Color downColor, Color upColor)
@@ -35,22 +38,42 @@ namespace keyviewer
             if (panel == null) throw new ArgumentNullException(nameof(panel));
 
             ApplyContextAndHandlersRecursive(panel);
-
-            var kp = new KeyPanel(panel, key, downColor, upColor);
+            
+            if (_obsCompatibilityMode)
+            {
+                // OBS 모드: 패널에 텍스트 그리기 및 드래그 핸들러 연결
+                panel.Visible = true;
+                panel.Paint += (s, e) =>
+                {
+                    if (s is Panel p)
+                    {
+                        var kp = KeyPanels.Find(k => k.Panel == p);
+                        if (kp != null)
+                        {
+                            DrawKeyText(e.Graphics, p, kp.Key, p.BackColor);
+                        }
+                    }
+                };
+                AttachPanelDragHandlers(panel);
+            }
+            
+            var kp = new KeyPanel(panel, key, downColor, upColor, _obsCompatibilityMode);
             KeyPanels.Add(kp);
-            AttachLayeredWindowHandlers(kp); // 레이어드 윈도우 핸들러 연결
+            
+            if (!_obsCompatibilityMode)
+                AttachLayeredWindowHandlers(kp);
+            
             return kp;
         }
 
         public KeyPanel AddKeyPanel(Keys key, Color downColor, Color upColor, Point location, Size? size = null)
         {
-            Size panelSize = size ?? new Size(85, 85); // 기본 크기를 85x85로 변경
+            Size panelSize = size ?? new Size(85, 85);
             string nameBase = "panel";
             int idx = 1;
             while (_form.Controls.Find(nameBase + idx, false).Length > 0) idx++;
             string name = nameBase + idx;
 
-            // 더미 패널(위치/크기 저장용, 숨김)
             var panel = new Panel
             {
                 BackColor = _defaultColor,
@@ -58,19 +81,71 @@ namespace keyviewer
                 Name = name,
                 Size = panelSize,
                 TabIndex = _form.Controls.Count,
-                Visible = false // 레이어드 윈도우가 대신 표시됨
+                Visible = _obsCompatibilityMode // OBS 모드에서는 보이도록
             };
+
+            if (_obsCompatibilityMode)
+            {
+                // OBS 모드: 패널에 직접 텍스트 그리기
+                panel.Paint += (s, e) =>
+                {
+                    if (s is Panel p)
+                    {
+                        // KeyPanel을 찾아서 현재 색상 가져오기
+                        var kp = KeyPanels.Find(k => k.Panel == p);
+                        if (kp != null)
+                        {
+                            DrawKeyText(e.Graphics, p, kp.Key, p.BackColor);
+                        }
+                    }
+                };
+                
+                // OBS 모드: 패널 드래그 핸들러 연결
+                AttachPanelDragHandlers(panel);
+            }
 
             ApplyContextAndHandlersRecursive(panel);
             _form.Controls.Add(panel);
 
-            var kp = new KeyPanel(panel, key, downColor, upColor);
+            var kp = new KeyPanel(panel, key, downColor, upColor, _obsCompatibilityMode);
             KeyPanels.Add(kp);
             
-            // 레이어드 윈도우에 마우스 핸들러 연결
-            AttachLayeredWindowHandlers(kp);
+            if (!_obsCompatibilityMode)
+                AttachLayeredWindowHandlers(kp);
             
             return kp;
+        }
+
+        private void DrawKeyText(Graphics g, Panel panel, Keys key, Color bgColor)
+        {
+            string keyText = GetKeyDisplayName(key);
+            
+            // 레이어드 윈도우 모드와 동일한 폰트 크기 계산
+            int fontSize = Math.Max(8, Math.Min(panel.Width, panel.Height) / 3);
+            using var font = new Font("Arial", fontSize, FontStyle.Bold);
+            using var brush = new SolidBrush(GetContrastColor(bgColor));
+            var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            g.DrawString(keyText, font, brush, panel.ClientRectangle, sf);
+        }
+
+        private string GetKeyDisplayName(Keys key)
+        {
+            return key switch
+            {
+                Keys.LControlKey or Keys.RControlKey or Keys.ControlKey => "Ctrl",
+                Keys.LShiftKey or Keys.RShiftKey or Keys.ShiftKey => "Shift",
+                Keys.LMenu or Keys.RMenu or Keys.Menu => "Alt",
+                Keys.Space => "Space",
+                _ => key.ToString().Replace("Key", "")
+            };
+        }
+
+        private Color GetContrastColor(Color bg)
+        {
+            int yiq = ((bg.R * 299) + (bg.G * 587) + (bg.B * 114)) / 1000;
+            return yiq >= 128 ? Color.Black : Color.White;
         }
 
         // 레이어드 윈도우에 드래그/우클릭 핸들러 연결
@@ -202,6 +277,54 @@ namespace keyviewer
                 c.MouseUp -= _mouseUp;
                 c.MouseUp += _mouseUp;
             }
+        }
+
+        // OBS 모드용 패널 드래그 핸들러
+        private void AttachPanelDragHandlers(Panel panel)
+        {
+            bool dragging = false;
+            Point dragStart = Point.Empty;
+            Point locStart = Point.Empty;
+
+            panel.MouseDown += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    dragging = true;
+                    dragStart = Control.MousePosition;
+                    locStart = panel.Location;
+                    panel.Capture = true;
+                }
+            };
+
+            panel.MouseMove += (s, e) =>
+            {
+                if (!dragging) return;
+                
+                Point current = Control.MousePosition;
+                int dx = current.X - dragStart.X;
+                int dy = current.Y - dragStart.Y;
+                Point newLoc = new Point(locStart.X + dx, locStart.Y + dy);
+
+                // 그리드 스냅 (10px)
+                newLoc.X -= newLoc.X % 10;
+                newLoc.Y -= newLoc.Y % 10;
+
+                // 폼 경계 내로 제한
+                newLoc.X = Math.Clamp(newLoc.X, 0, Math.Max(0, _form.ClientSize.Width - panel.Width));
+                newLoc.Y = Math.Clamp(newLoc.Y, 0, Math.Max(0, _form.ClientSize.Height - panel.Height));
+
+                panel.Location = newLoc;
+            };
+
+            panel.MouseUp += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    panel.Capture = false;
+                    dragging = false;
+                }
+            };
         }
     }
 }

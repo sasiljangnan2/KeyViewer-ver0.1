@@ -18,9 +18,11 @@ namespace keyviewer
         private Label _lblKeyAlpha;
         private TrackBar _tbWindowOpacity;
         private Label _lblWindowOpacity;
-        private CheckBox _chkTransparentBg; // 새로 추가: 배경 투명화 체크박스
+        private CheckBox _chkTransparentBg;
         private ColorDialog _colorDialog;
         private OpenFileDialog _openFileDialog;
+        private System.Windows.Forms.Label _lblChromaKey = null!;
+        private System.Windows.Forms.ComboBox _cboChromaKey = null!;
 
         private void InitializeComponent()
         {
@@ -148,9 +150,9 @@ namespace keyviewer
             // 
             _lblWindowOpacity.Location = new Point(376, 196);
             _lblWindowOpacity.Name = "_lblWindowOpacity";
-            _lblWindowOpacity.Size = new Size(140, 23);
+            _lblWindowOpacity.Size = new Size(150, 23);
             _lblWindowOpacity.TabIndex = 11;
-            _lblWindowOpacity.Text = "Background Alpha: 255";
+            _lblWindowOpacity.Text = "Window Opacity: 100%"; // 변경
             // 
             // _chkTransparentBg
             // 
@@ -160,6 +162,31 @@ namespace keyviewer
             _chkTransparentBg.TabIndex = 12;
             _chkTransparentBg.Text = "배경 완전 투명화";
             _chkTransparentBg.CheckedChanged += ChkTransparentBg_CheckedChanged;
+            // 
+            // 크로마키 색상 레이블
+            // 
+            _lblChromaKey = new System.Windows.Forms.Label();
+            _lblChromaKey.AutoSize = true;
+            _lblChromaKey.Location = new System.Drawing.Point(220, 240);
+            _lblChromaKey.Name = "_lblChromaKey";
+            _lblChromaKey.Size = new System.Drawing.Size(120, 15);
+            _lblChromaKey.Text = "Chroma Key:";
+            // 
+            // 크로마키 색상 선택 콤보박스
+            // 
+            _cboChromaKey = new System.Windows.Forms.ComboBox();
+            _cboChromaKey.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            _cboChromaKey.FormattingEnabled = true;
+            _cboChromaKey.Items.AddRange(new object[] {
+                "Magenta",
+                "Green",
+                "Blue",
+                "Black"
+            });
+            _cboChromaKey.Location = new System.Drawing.Point(310, 237);
+            _cboChromaKey.Name = "_cboChromaKey";
+            _cboChromaKey.Size = new System.Drawing.Size(110, 23);
+            _cboChromaKey.SelectedIndex = 0;
             // 
             // GlobalEditorControl
             // 
@@ -176,6 +203,8 @@ namespace keyviewer
             Controls.Add(_tbWindowOpacity);
             Controls.Add(_lblWindowOpacity);
             Controls.Add(_chkTransparentBg);
+            Controls.Add(_lblChromaKey);
+            Controls.Add(_cboChromaKey);
             Name = "GlobalEditorControl";
             Size = new Size(520, 280);
             ((System.ComponentModel.ISupportInitialize)_tbKeyAlpha).EndInit();
