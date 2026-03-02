@@ -18,6 +18,8 @@ namespace keyviewer
         private Label _lblWidth;
         private Label _lblHeight;
         private ColorDialog _colorDialog;
+        private Button _btnRecord; // 녹화 시작 버튼
+        private Label _lblCurrentKeyInfo; // 현재 입력 상태 표시 라벨
 
         private void InitializeComponent()
         {
@@ -33,44 +35,58 @@ namespace keyviewer
             _lblWidth = new Label();
             _lblHeight = new Label();
             _colorDialog = new ColorDialog();
+            _btnRecord = new Button();
+            _lblCurrentKeyInfo = new Label();
 
-            // cbKeys
-            _cbKeys.Left = 8;
-            _cbKeys.Top = 8;
-            _cbKeys.Width = 320;
-            _cbKeys.DropDownStyle = ComboBoxStyle.DropDownList;
+            // 녹화 시작 버튼 설정
+            _btnRecord.Location = new Point(235, 23);
+            _btnRecord.Size = new Size(130, 28);
+            _btnRecord.Text = "단축키 설정";
+            _btnRecord.Click += BtnRecord_Click;
+
+            // 입력 정보 라벨 설정
+            _lblCurrentKeyInfo.Location = new Point(10, 5);
+            _lblCurrentKeyInfo.Size = new Size(300, 15);
+            _lblCurrentKeyInfo.Text = "단축키를 설정하려면 버튼을 누르세요";
+
+            // 전체 컨트롤 크기 확장 (버튼이 보일 수 있게)
+            this.Size = new Size(460, 240);
+            this.Height = 250;
+            this.Controls.Add(_btnRecord);
+            this.Controls.Add(_lblCurrentKeyInfo);
+
+            // cbKeys(ComboBox)
+            _cbKeys.Location = new Point(10, 25);
+            _cbKeys.Width = 220;
+            _cbKeys.Enabled = true; // 직접 입력 방지
+            _cbKeys.DropDownStyle = ComboBoxStyle.DropDown;
 
             // btnUpColor
-            _btnUpColor.Left = 8;
-            _btnUpColor.Top = 44;
+            _btnUpColor.Location = new Point(10, 70);
             _btnUpColor.Width = 120;
             _btnUpColor.Text = "Up Color...";
             _btnUpColor.Click += BtnUpColor_Click;
 
             // previewUp
-            _previewUp.Left = 140;
-            _previewUp.Top = 44;
+            _previewUp.Location = new Point(160, 70);
             _previewUp.Size = new Size(40, 24);
             _previewUp.BackColor = Color.Gray;
             _previewUp.BorderStyle = BorderStyle.FixedSingle;
 
             // btnDownColor
-            _btnDownColor.Left = 8;
-            _btnDownColor.Top = 84;
+            _btnDownColor.Location = new Point(10, 105);
             _btnDownColor.Width = 120;
             _btnDownColor.Text = "Down Color...";
             _btnDownColor.Click += BtnDownColor_Click;
 
             // previewDown
-            _previewDown.Left = 140;
-            _previewDown.Top = 84;
+            _previewDown.Location = new Point(160, 105);
             _previewDown.Size = new Size(40, 24);
             _previewDown.BackColor = Color.Red;
             _previewDown.BorderStyle = BorderStyle.FixedSingle;
 
             // tbAlpha
-            _tbAlpha.Left = 8;
-            _tbAlpha.Top = 124;
+            _tbAlpha.Location = new Point(10, 145);
             _tbAlpha.Width = 320;
             _tbAlpha.Minimum = 0;
             _tbAlpha.Maximum = 255;
@@ -79,36 +95,31 @@ namespace keyviewer
             _tbAlpha.Scroll += TbAlpha_Scroll;
 
             // lblAlpha
-            _lblAlpha.Left = 336;
-            _lblAlpha.Top = 124;
+            _lblAlpha.Location = new Point(340, 145);
             _lblAlpha.Width = 120;
             _lblAlpha.Text = "Alpha: 255";
 
             // lblWidth
-            _lblWidth.Left = 8;
-            _lblWidth.Top = 164;
+            _lblWidth.Location = new Point(10, 195);
             _lblWidth.Width = 60;
             _lblWidth.Text = "Width:";
             _lblWidth.TextAlign = ContentAlignment.MiddleLeft;
 
             // numWidth
-            _numWidth.Left = 70;
-            _numWidth.Top = 164;
+            _numWidth.Location = new Point(80, 195);
             _numWidth.Width = 80;
             _numWidth.Minimum = 20;
             _numWidth.Maximum = 500;
             _numWidth.Value = 85; // 기본값 85
 
             // lblHeight
-            _lblHeight.Left = 200;
-            _lblHeight.Top = 164;
+            _lblHeight.Location = new Point(180, 195);
             _lblHeight.Width = 60;
             _lblHeight.Text = "Height:";
             _lblHeight.TextAlign = ContentAlignment.MiddleLeft;
 
             // numHeight
-            _numHeight.Left = 262;
-            _numHeight.Top = 164;
+            _numHeight.Location = new Point(250, 195);
             _numHeight.Width = 80;
             _numHeight.Minimum = 20;
             _numHeight.Maximum = 500;
@@ -124,11 +135,12 @@ namespace keyviewer
                 _btnDownColor, _previewDown, 
                 _tbAlpha, _lblAlpha,
                 _lblWidth, _numWidth,
-                _lblHeight, _numHeight
+                _lblHeight, _numHeight,
+                _btnRecord,
+                _lblCurrentKeyInfo
             });
 
-            Width = 480;
-            Height = 204; // 높이 증가 (크기 입력 필드 추가)
+
         }
     }
 }

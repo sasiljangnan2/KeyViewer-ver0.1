@@ -19,17 +19,35 @@ namespace keyviewer
         public PanelEditorForm()
         {
             InitializeComponent();
+
+            this.KeyPreview = true; // 키 입력 가로채지 못하게
+
+            // UI 컨트롤 생성 로직
             _editor = new PanelEditorControl { Dock = DockStyle.Top };
             _btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Dock = DockStyle.Bottom };
             _btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Dock = DockStyle.Bottom };
+
+            _editor.Height = 240;
 
             Controls.Add(_editor);
             Controls.Add(_btnCancel);
             Controls.Add(_btnOk);
 
-            ClientSize = new Size(Math.Max(420, _editor.Width), _editor.Height + 56);
+
+            ClientSize = new Size(480, 320);
             AcceptButton = _btnOk;
             CancelButton = _btnCancel;
+
+            this.FormClosing += (s, e) =>
+            {
+                // 녹화 플래그가 있는 컨트롤의 상태를 해제
+            };
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            // 녹화 중일 때 창을 닫으면 플래그를 꺼줌
+            base.OnFormClosing(e);
         }
 
         public PanelEditorForm(Keys initialKey, Color upColor, Color downColor) : this()
