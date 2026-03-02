@@ -80,7 +80,7 @@ namespace keyviewer
             Directory.CreateDirectory(_layoutsDir);
 
             // 컨텍스트 메뉴 초기화 (먼저 생성)
-            InitializeContextMenu();
+            InitializeContextMenu(); 
 
             // 서비스 생성: Form의 마우스 드래그 핸들러를 전달하고 컨텍스트 메뉴 자동 할당 위임
             _panelService = new KeyPanelService(this, _defaultColor, Panel_MouseDown, Panel_MouseMove, Panel_MouseUp, _contextMenuStrip);
