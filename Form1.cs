@@ -121,7 +121,7 @@ namespace keyviewer
                     }
                 };
                 
-                // 🆕 폼이 활성화될 때 레이어드 윈도우도 앞으로
+                //  폼이 활성화될 때 레이어드 윈도우도 앞으로
                 this.Activated += (s, e) =>
                 {
                     foreach (var kp in _keyPanels)
@@ -134,7 +134,7 @@ namespace keyviewer
                 };
             }
             
-            // 🆕 디버깅: 키 패널이 없으면 기본 키 추가
+            //  디버깅: 키 패널이 없으면 기본 키 추가
             if (_keyPanels.Count == 0)
             {
                 // 테스트용 기본 키 추가
