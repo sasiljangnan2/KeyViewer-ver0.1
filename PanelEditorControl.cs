@@ -7,6 +7,93 @@ namespace keyviewer
 {
     public partial class PanelEditorControl : UserControl
     {
+
+        private bool _isRecording = false; // 녹화 상태 플래그
+        private Keys _lastRecordedKey = Keys.None; // 마지막으로 입력된 키를 녹화하기 위한 변수
+
+        private void BtnRecord_Click(object sender, EventArgs e) // 단축키설정 녹화시작
+        {
+            if (!_isRecording) // 녹화가 시작됨
+            {
+
+                _isRecording = true;
+                _btnRecord.Text = "설정 중지하기";
+                _btnRecord.BackColor = Color.Red;
+                _btnRecord.ForeColor = Color.White;
+
+                _cbKeys.BackColor = Color.LemonChiffon;
+                _lblCurrentKeyInfo.Text = "키보드 키를 누르세요...";
+
+                // 포커스를 이 컨트롤로 가져와야 키 입력을 직접 받음
+                this.Focus();
+            }
+            else // 녹화가 중지됨
+             {
+                StopRecording();
+            }
+        }
+        //단축키 녹화 중지
+        private void StopRecording()
+        {
+            _isRecording = false;
+            _btnRecord.Text = "단축키 설정";
+            _btnRecord.BackColor = SystemColors.Control;
+            _btnRecord.ForeColor = SystemColors.ControlText;
+            _cbKeys.BackColor = SystemColors.Window;
+
+            //콤보박스 막혔을 경우 다시 활성화
+            if (_cbKeys != null) _cbKeys.Enabled = true;
+            
+            if (_lastRecordedKey != Keys.None)
+            {
+                this.SelectedKey = _lastRecordedKey;
+                _lblCurrentKeyInfo.Text = $"설정됨: {_lastRecordedKey}";
+            }
+        }
+
+        private void BtnStop_Click(object sender, EventArgs e) // 녹화 시작 시 작동하며 녹화를 중지하는 버튼 클릭 핸들러
+        {
+            _isRecording = false;
+            _btnRecord.Text = "단축키 설정";
+            _cbKeys.BackColor = SystemColors.Window;
+            _btnRecord.BackColor = SystemColors.Control;
+            _btnRecord.ForeColor = SystemColors.ControlText;
+
+            if (_cbKeys != null) _cbKeys.Enabled = true;
+            // 녹화된 마지막 키를 ComboBox에 반영
+            if (_lastRecordedKey != Keys.None)
+            {
+                this.SelectedKey = _lastRecordedKey;
+            }
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (_isRecording)
+            {
+                // 가장 마지막으로 누른 키만 저장(그 앞에 누른 키들은 제외)
+                _lastRecordedKey = keyData;
+                _cbKeys.Text = keyData.ToString();
+                _lblCurrentKeyInfo.Text = $"입력된 키: {keyData}"; // 키 이름을 띄움
+
+                return true; // 이 키 입력을 시스템에 넘기지 않고 여기서 소모함
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e) // 마우스 버튼을 입력할 때 녹화기능 작동
+        {
+            if (_isRecording)
+            {
+                if (e.Button == MouseButtons.Left) _lastRecordedKey = Keys.LButton;
+                else if (e.Button == MouseButtons.Right) _lastRecordedKey = Keys.RButton;
+
+                _lblCurrentKeyInfo.Text = $"입력된 키: {_lastRecordedKey}";
+                _cbKeys.Text = _lastRecordedKey.ToString(); // 화면에 즉시 표시
+            }
+            base.OnMouseDown(e);
+        }
+
         public PanelEditorControl()
         {
             InitializeComponent();
@@ -42,19 +129,7 @@ namespace keyviewer
 
             if (_cbKeys == null) return;
 
-            _cbKeys.Items.Clear();
-            foreach (Keys k in Enum.GetValues(typeof(Keys)))
-            {
-                _cbKeys.Items.Add(k);
-            }
 
-            if (_cbKeys.Items.Count > 0)
-            {
-                if (SelectedKey != Keys.None && _cbKeys.Items.Contains(SelectedKey))
-                    _cbKeys.SelectedItem = SelectedKey;
-                else
-                    _cbKeys.SelectedIndex = 0;
-            }
         }
 
         // 안전한 접근 헬퍼
@@ -70,14 +145,13 @@ namespace keyviewer
         [DefaultValue(Keys.None)]
         public Keys SelectedKey
         {
-            get => _cbKeys?.SelectedItem is Keys k ? k : Keys.None;
+            get => _lastRecordedKey;
             set
             {
                 if (_cbKeys == null) return;
-                if (_cbKeys.Items.Contains(value))
-                    _cbKeys.SelectedItem = value;
-                else if (_cbKeys.Items.Count > 0)
-                    _cbKeys.SelectedIndex = 0;
+
+                _lastRecordedKey = value; // 녹화 변수에 값 저장
+                _cbKeys.Text = value.ToString(); // 콤보박스 화면에 글자로만 표시
             }
         }
 

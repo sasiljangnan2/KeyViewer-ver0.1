@@ -83,12 +83,13 @@ namespace keyviewer
 
             _currentBgColor = this.BackColor;
             Directory.CreateDirectory(_layoutsDir);
+
+            // 컨텍스트 메뉴 초기화 (먼저 생성)
             InitializeContextMenu();
 
-            // OBS 모드를 서비스에 전달
-            _panelService = new KeyPanelService(this, _defaultColor, 
-                Panel_MouseDown, Panel_MouseMove, Panel_MouseUp, 
-                _contextMenuStrip, _obsCompatibilityMode);
+            // 서비스 생성: Form의 마우스 드래그 핸들러를 전달하고 컨텍스트 메뉴 자동 할당 위임
+            _panel_service_create:
+            _panelService = new KeyPanelService(this, _defaultColor, Panel_MouseDown, Panel_MouseMove, Panel_MouseUp, _contextMenuStrip);
 
             _initialWrappedCount = _keyPanels.Count;
 
@@ -120,7 +121,7 @@ namespace keyviewer
                     }
                 };
                 
-                // 🆕 폼이 활성화될 때 레이어드 윈도우도 앞으로
+                //  폼이 활성화될 때 레이어드 윈도우도 앞으로
                 this.Activated += (s, e) =>
                 {
                     foreach (var kp in _keyPanels)
@@ -133,7 +134,7 @@ namespace keyviewer
                 };
             }
             
-            // 🆕 디버깅: 키 패널이 없으면 기본 키 추가
+            //  디버깅: 키 패널이 없으면 기본 키 추가
             if (_keyPanels.Count == 0)
             {
                 // 테스트용 기본 키 추가
@@ -298,6 +299,11 @@ namespace keyviewer
         {
             if (nCode >= 0)
             {
+                if (Application.OpenForms.OfType<PanelEditorForm>().Any())
+                {
+                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                }
+
                 int msg = wParam.ToInt32();
                 if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)
                 {
@@ -406,7 +412,7 @@ namespace keyviewer
                     var up = editor.SelectedUpColor;
                     var down = editor.SelectedDownColor;
                     var size = editor.SelectedSize; // 사용자가 입력한 크기 사용
-                    
+
                     // 폼 내부로 클램프
                     loc.X = Math.Clamp(loc.X, 0, Math.Max(0, ClientSize.Width - size.Width));
                     loc.Y = Math.Clamp(loc.Y, 0, Math.Max(0, ClientSize.Height - size.Height));
@@ -579,7 +585,7 @@ namespace keyviewer
         private KeyPanel? GetKeyPanelFromContext()
         {
             Control? src = _contextMenuStrip?.SourceControl;
-            
+
             // 레이어드 윈도우에서 우클릭한 경우
             if (src is Form layered)
             {
@@ -607,7 +613,7 @@ namespace keyviewer
                 kp.UpColor = editor.SelectedUpColor;
                 kp.DownColor = editor.SelectedDownColor;
                 kp.Panel.BackColor = kp.UpColor;
-                
+
                 // 크기 변경 지원 (사용자가 수정한 경우)
                 var newSize = editor.SelectedSize;
                 if (kp.Panel.Size != newSize)
@@ -615,7 +621,7 @@ namespace keyviewer
                     kp.Panel.Size = newSize;
                     kp.UpdateSize(newSize);
                 }
-                
+
                 kp.UpdateVisual(); // 레이어드 윈도우 갱신
             }
         }
@@ -629,5 +635,15 @@ namespace keyviewer
             if (color.R == 0 && color.G == 0 && color.B == 0) return "Black";
             return "Custom";
         }
+
+        private void Form1_KeyDown(object sender, KeyEventArgs e)
+        {
+            // 현재 에디터 창이 열려 있고, 그 안에서 '녹화 중'이라면 메인 로직 무시
+            if (Application.OpenForms["PanelEditorForm"] != null)
+            {
+                return; // 메인 화면의 키 인식을 잠시 중단
+            }
+        }
     }
+
 }

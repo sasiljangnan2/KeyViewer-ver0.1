@@ -59,4 +59,4 @@
 
 5. PanelEditorControl.cs 자판을 우클릭해서 '편집'을 눌렀을 때 뜨는 수정 창의 로직
 	(1)BtnUpColor_Click(object? sender, EventArgs e), private void BtnDownColor_Click(object? sender, EventArgs e)
-	-ColorDialog를 띄워서 사용자가 원하는 색상을 직접 고르게 하고, 그 결과를 프리뷰 박스에 보여줌.
+	-ColorDialog를 띄워서 사용자가 원하는 색상을 직접 고르게 하고, 그 결과를 프리뷰 박스에 보여줌.   
