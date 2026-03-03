@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Text.Json.Serialization;
@@ -23,5 +23,18 @@ namespace keyviewer
     {
         public string? Name { get; set; }
         public List<KeyPanelConfig> Panels { get; set; } = new List<KeyPanelConfig>();
+        
+        // 🆕 창 설정
+        public int FormWidth { get; set; } = 800;
+        public int FormHeight { get; set; } = 600;
+        
+        // 🆕 배경 설정
+        public int BackgroundColorArgb { get; set; } = SystemColors.Control.ToArgb();
+        public string? BackgroundImagePath { get; set; }
+        public bool BackgroundTransparent { get; set; }
+        public int ChromaKeyColorArgb { get; set; } = Color.Magenta.ToArgb();
+        
+        // 🆕 투명도 설정
+        public int WindowOpacityPercent { get; set; } = 100;
     }
 }

@@ -214,7 +214,24 @@ namespace keyviewer
             };
             if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
-            var layout = new KeyLayout { Name = Path.GetFileNameWithoutExtension(dlg.FileName) };
+            var layout = new KeyLayout 
+            { 
+                Name = Path.GetFileNameWithoutExtension(dlg.FileName),
+                
+                // 🆕 창 크기 저장
+                FormWidth = this.ClientSize.Width,
+                FormHeight = this.ClientSize.Height,
+                
+                // 🆕 배경 설정 저장
+                BackgroundColorArgb = _currentBgColor.ToArgb(),
+                BackgroundImagePath = _currentBgImagePath,
+                BackgroundTransparent = _backgroundTransparent,
+                ChromaKeyColorArgb = _chromaKeyColor.ToArgb(),
+                
+                // 🆕 투명도 저장
+                WindowOpacityPercent = (int)(this.Opacity * 100)
+            };
+            
             foreach (var kp in _keyPanels)
             {
                 var cfg = new KeyPanelConfig
@@ -405,9 +422,8 @@ namespace keyviewer
                 {
                     var up = editor.SelectedUpColor;
                     var down = editor.SelectedDownColor;
-                    var size = editor.SelectedSize; // 사용자가 입력한 크기 사용
-
-                    // 폼 내부로 클램프
+                    var size = editor.SelectedSize;
+                    
                     loc.X = Math.Clamp(loc.X, 0, Math.Max(0, ClientSize.Width - size.Width));
                     loc.Y = Math.Clamp(loc.Y, 0, Math.Max(0, ClientSize.Height - size.Height));
 
@@ -416,16 +432,35 @@ namespace keyviewer
                 }
             };
 
-            var setEditorItem = new ToolStripMenuItem("Edit Panel...");
-            setEditorItem.Click += (s, e) =>
+            // 🆕 조건부로 표시되는 메뉴 항목들
+            var editPanelItem = new ToolStripMenuItem("Edit Panel...");
+            editPanelItem.Click += (s, e) =>
             {
                 var kp = GetKeyPanelFromContext();
                 if (kp == null) return;
                 OpenPanelEditor(kp);
             };
 
-            var exitItem = new ToolStripMenuItem("Exit");
-            exitItem.Click += (s, e) => this.Close();
+            var deletePanelItem = new ToolStripMenuItem("Delete Panel");
+            deletePanelItem.Click += (s, e) =>
+            {
+                var kp = GetKeyPanelFromContext();
+                if (kp == null) return;
+
+                var result = MessageBox.Show(this,
+                    $"Delete key panel '{kp.Key}'?",
+                    "Confirm Delete",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
+                {
+                    kp.Dispose();
+                    if (kp.Panel.Parent != null)
+                        Controls.Remove(kp.Panel);
+                    _keyPanels.Remove(kp);
+                }
+            };
 
             var globalSettingsItem = new ToolStripMenuItem("Global Settings...");
             globalSettingsItem.Click += (s, e) =>
@@ -443,8 +478,6 @@ namespace keyviewer
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     _chromaKeyColor = dlg.ChromaKeyColor;
-
-                    // 배경 투명화 모드가 아닐 때만 키 알파 적용
                     int finalAlpha = dlg.SelectedKeyAlpha;
 
                     foreach (var kp in _keyPanels)
@@ -460,7 +493,6 @@ namespace keyviewer
                     _currentBgImagePath = dlg.SelectedBgImagePath;
                     _backgroundTransparent = dlg.BackgroundTransparent;
 
-                    // 배경 투명화 적용
                     if (_backgroundTransparent)
                     {
                         this.BackgroundImage?.Dispose();
@@ -520,8 +552,6 @@ namespace keyviewer
                                 "OBS에서 반투명을 캡처하려면:\n\n" +
                                 "1. Window Capture → Capture Method를\n" +
                                 "   'Windows 10 (1903+)'로 변경\n\n" +
-                                "또는\n\n" +
-                                "2. Game Capture 사용\n" +
                                 "   (Allow Transparency 체크)",
                                 "OBS Transparency Tip",
                                 MessageBoxButtons.OK,
@@ -531,7 +561,6 @@ namespace keyviewer
                 }
             };
 
-            // InitializeContextMenu()에 추가
             var debugItem = new ToolStripMenuItem("Debug: Show Window Info");
             debugItem.Click += (s, e) =>
             {
@@ -559,21 +588,40 @@ namespace keyviewer
                 MessageBox.Show(this, info, "Debug Info");
             };
 
+            var exitItem = new ToolStripMenuItem("Exit");
+            exitItem.Click += (s, e) => this.Close();
+
+            // 기본 메뉴 항목 추가
             _contextMenuStrip.Items.Add(toggleTopMost);
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(layoutsItem);
-            _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(saveLayoutItem);
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(addPanelItem);
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
-            _contextMenuStrip.Items.Add(setEditorItem);
-            _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(globalSettingsItem);
-            _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(debugItem);
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(exitItem);
+
+            // 🆕 Opening 이벤트: 메뉴가 열릴 때 동적으로 항목 추가/제거
+            _contextMenuStrip.Opening += (s, e) =>
+            {
+                // 기존 Edit/Delete 항목 제거
+                _contextMenuStrip.Items.Remove(editPanelItem);
+                _contextMenuStrip.Items.Remove(deletePanelItem);
+
+                // 키 패널에서 우클릭한 경우에만 Edit/Delete 추가
+                var kp = GetKeyPanelFromContext();
+                if (kp != null)
+                {
+                    // "Add Key Panel" 다음에 삽입 (인덱스 5 위치)
+                    int insertIndex = _contextMenuStrip.Items.IndexOf(addPanelItem) + 1;
+                    
+                    _contextMenuStrip.Items.Insert(insertIndex, editPanelItem);
+                    _contextMenuStrip.Items.Insert(insertIndex + 1, deletePanelItem);
+                }
+            };
         }
 
         private KeyPanel? GetKeyPanelFromContext()
