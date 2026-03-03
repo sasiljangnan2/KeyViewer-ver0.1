@@ -25,7 +25,7 @@ namespace keyviewer
         private readonly string _layoutsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "layouts");
 
         // 드래그 상태 필드
-        private bool _dragging = false;
+        private bool _dragging = true;
         private Point _dragStartMouse;
         private Point _dragStartLocation;
         private Control? _draggedControl;
@@ -55,6 +55,9 @@ namespace keyviewer
         private bool _backgroundTransparent = false; // 배경 투명화 상태
         private readonly Color _transparencyKeyColor = Color.Magenta; // TransparencyKey 색
 
+        // 필드 추가
+        private Color _chromaKeyColor = Color.FromArgb(255, 0, 255); // 기본 마젠타
+
         // P/Invoke: 키보드 훅 관련 (필요)
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
@@ -69,31 +72,29 @@ namespace keyviewer
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr GetModuleHandle(string lpModuleName);
 
+        private bool _obsCompatibilityMode = false; // OBS 호환 모드
+
         public Form1()
         {
             InitializeComponent();
 
-            // 초기 배경 상태 저장
+            // OBS 호환 모드 활성화 여부 설정
+            _obsCompatibilityMode = true; // 레이어드 윈도우 모드로 변경
+
             _currentBgColor = this.BackColor;
-
-            // 레이아웃 폴더 보장
             Directory.CreateDirectory(_layoutsDir);
-
-            // 컨텍스트 메뉴 초기화 (먼저 생성)
             InitializeContextMenu();
 
-            // 서비스 생성: Form의 마우스 드래그 핸들러를 전달하고 컨텍스트 메뉴 자동 할당 위임
-            _panel_service_create:
-            _panelService = new KeyPanelService(this, _defaultColor, Panel_MouseDown, Panel_MouseMove, Panel_MouseUp, _contextMenuStrip);
+            // OBS 모드를 서비스에 전달
+            _panelService = new KeyPanelService(this, _defaultColor,
+                Panel_MouseDown, Panel_MouseMove, Panel_MouseUp,
+                _contextMenuStrip, _obsCompatibilityMode);
 
-            // 초기 래핑된 개수 저장 (디자이너 패널을 더 이상 래핑하지 않음)
             _initialWrappedCount = _keyPanels.Count;
 
-            // 전역 후크 설치
             _proc = HookCallback;
             _hookID = InstallHook(_proc);
 
-            // 폼 자체의 우클릭도 컨텍스트 메뉴가 뜨도록 연결
             this.ContextMenuStrip = _contextMenuStrip;
 
             if (!_obsCompatibilityMode)
@@ -102,13 +103,13 @@ namespace keyviewer
                 this.LocationChanged += (s, e) => SyncLayeredWindows();
                 this.SizeChanged += (s, e) => SyncLayeredWindows();
                 this.VisibleChanged += (s, e) => SyncLayeredWindowsVisibility();
-                
+
                 // 🆕 폼이 로드된 후 레이어드 윈도우 동기화
                 this.Load += (s, e) =>
                 {
                     SyncLayeredWindows();
                     SyncLayeredWindowsVisibility();
-                    
+
                     // TopMost 설정
                     foreach (var kp in _keyPanels)
                     {
@@ -118,8 +119,8 @@ namespace keyviewer
                         }
                     }
                 };
-                
-                //  폼이 활성화될 때 레이어드 윈도우도 앞으로
+
+                // 🆕 폼이 활성화될 때 레이어드 윈도우도 앞으로
                 this.Activated += (s, e) =>
                 {
                     foreach (var kp in _keyPanels)
@@ -131,16 +132,16 @@ namespace keyviewer
                     }
                 };
             }
-            
-            //  디버깅: 키 패널이 없으면 기본 키 추가
+
+            // 🆕 디버깅: 키 패널이 없으면 기본 키 추가
             if (_keyPanels.Count == 0)
             {
                 // 테스트용 기본 키 추가
                 var testKey = _panelService.AddKeyPanel(
-                    Keys.Space, 
-                    Color.Red, 
-                    Color.Gray, 
-                    new Point(10, 10), 
+                    Keys.Space,
+                    Color.Red,
+                    Color.Gray,
+                    new Point(10, 10),
                     new Size(85, 85)
                 );
                 testKey.UpdateVisual();
@@ -297,11 +298,6 @@ namespace keyviewer
         {
             if (nCode >= 0)
             {
-                if (Application.OpenForms.OfType<PanelEditorForm>().Any())
-                {
-                    return CallNextHookEx(_hookID, nCode, wParam, lParam);
-                }
-
                 int msg = wParam.ToInt32();
                 if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)
                 {
@@ -382,6 +378,14 @@ namespace keyviewer
                     {
                         kp.Panel.ContextMenuStrip = _contextMenuStrip;
                         kp.UpdateVisual();
+
+                        // 🆕 레이어드 윈도우 위치 동기화
+                        if (!_obsCompatibilityMode)
+                        {
+                            var screenLoc = this.PointToScreen(kp.Panel.Location);
+                            kp.UpdatePosition(screenLoc);
+                            kp.Show();
+                        }
                     }
                 }
             };
@@ -433,18 +437,22 @@ namespace keyviewer
                 int keyAlphaInit = _keyPanels.Count > 0 ? _keyPanels[0].UpColor.A : 255;
                 int opacityPercent = (int)(this.Opacity * 100);
 
-                using var dlg = new GlobalEditorForm(upInit, downInit, bgInit, currentBgPath, keyAlphaInit, opacityPercent, _backgroundTransparent);
+                using var dlg = new GlobalEditorForm(upInit, downInit, bgInit, currentBgPath,
+                    keyAlphaInit, opacityPercent, _backgroundTransparent, _chromaKeyColor);
+
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
-                    // 배경 투명화 모드: 키 알파를 강제로 255로 설정 (마젠타가 비치지 않도록)
-                    int finalAlpha = dlg.BackgroundTransparent ? 255 : dlg.SelectedUpColor.A;
+                    _chromaKeyColor = dlg.ChromaKeyColor;
+
+                    // 배경 투명화 모드가 아닐 때만 키 알파 적용
+                    int finalAlpha = dlg.SelectedKeyAlpha;
 
                     foreach (var kp in _keyPanels)
                     {
                         kp.UpColor = Color.FromArgb(finalAlpha, dlg.SelectedUpColor);
                         kp.DownColor = Color.FromArgb(finalAlpha, dlg.SelectedDownColor);
                         kp.Panel.BackColor = kp.UpColor;
-                        kp.UpdateVisual(); // 레이어드 윈도우 갱신
+                        kp.UpdateVisual();
                     }
 
                     this.BackColor = dlg.SelectedBgColor;
@@ -457,8 +465,23 @@ namespace keyviewer
                     {
                         this.BackgroundImage?.Dispose();
                         this.BackgroundImage = null;
-                        this.BackColor = _transparencyKeyColor;
-                        this.TransparencyKey = _transparencyKeyColor;
+                        this.BackColor = _chromaKeyColor;
+                        this.TransparencyKey = _chromaKeyColor;
+
+                        if (_obsCompatibilityMode)
+                        {
+                            MessageBox.Show(this,
+                                $"OBS Setup Instructions:\n\n" +
+                                $"1. Add 'Window Capture' source\n" +
+                                $"2. Capture Method: 'Windows 10 (1903+)'\n" +
+                                $"3. Enable 'Capture Client Area'\n" +
+                                $"4. (Optional) Add 'Chroma Key' filter\n" +
+                                $"5. Select color: {GetChromaKeyName(_chromaKeyColor)}\n\n" +
+                                $"OR use 'Game Capture' with 'Allow Transparency' enabled",
+                                "OBS Transparency Setup",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+                        }
                     }
                     else
                     {
@@ -484,7 +507,56 @@ namespace keyviewer
                             MessageBox.Show(this, $"이미지 적용 실패: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         }
                     }
+
+                    // 🔥 폼 불투명도 적용 (배경 반투명)
+                    this.Opacity = dlg.SelectedOpacityPercent / 100.0;
+
+                    // 반투명 설정 안내 메시지
+                    if (dlg.SelectedOpacityPercent < 100 || dlg.SelectedKeyAlpha < 255)
+                    {
+                        if (_obsCompatibilityMode && !_backgroundTransparent)
+                        {
+                            MessageBox.Show(this,
+                                "OBS에서 반투명을 캡처하려면:\n\n" +
+                                "1. Window Capture → Capture Method를\n" +
+                                "   'Windows 10 (1903+)'로 변경\n\n" +
+                                "또는\n\n" +
+                                "2. Game Capture 사용\n" +
+                                "   (Allow Transparency 체크)",
+                                "OBS Transparency Tip",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
+                        }
+                    }
                 }
+            };
+
+            // InitializeContextMenu()에 추가
+            var debugItem = new ToolStripMenuItem("Debug: Show Window Info");
+            debugItem.Click += (s, e) =>
+            {
+                var info = $"Mode: {(_obsCompatibilityMode ? "OBS" : "Layered")}\n" +
+                           $"Key Panels: {_keyPanels.Count}\n" +
+                           $"Form: {this.Location}, Size: {this.Size}\n\n";
+
+                foreach (var kp in _keyPanels)
+                {
+                    info += $"Panel {kp.Key}:\n";
+                    info += $"  Panel Pos: {kp.Panel.Location}\n";
+                    if (kp.LayeredWindow != null && !kp.LayeredWindow.IsDisposed)
+                    {
+                        info += $"  Layered Pos: {kp.LayeredWindow.Location}\n";
+                        info += $"  Layered Size: {kp.LayeredWindow.Size}\n";
+                        info += $"  Visible: {kp.LayeredWindow.Visible}\n";
+                    }
+                    else
+                    {
+                        info += "  Layered Window: NULL or Disposed\n";
+                    }
+                    info += "\n";
+                }
+
+                MessageBox.Show(this, info, "Debug Info");
             };
 
             _contextMenuStrip.Items.Add(toggleTopMost);
@@ -498,6 +570,8 @@ namespace keyviewer
             _contextMenuStrip.Items.Add(setEditorItem);
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(globalSettingsItem);
+            _contextMenuStrip.Items.Add(new ToolStripSeparator());
+            _contextMenuStrip.Items.Add(debugItem);
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(exitItem);
         }
@@ -546,14 +620,14 @@ namespace keyviewer
             }
         }
 
-        private void Form1_KeyDown(object sender, KeyEventArgs e)
+        // 헬퍼 메서드 추가
+        private string GetChromaKeyName(Color color)
         {
-            // 현재 에디터 창이 열려 있고, 그 안에서 '녹화 중'이라면 메인 로직 무시
-            if (Application.OpenForms["PanelEditorForm"] != null)
-            {
-                return; // 메인 화면의 키 인식을 잠시 중단
-            }
+            if (color.R == 255 && color.G == 0 && color.B == 255) return "Magenta/Pink";
+            if (color.R == 0 && color.G == 255 && color.B == 0) return "Green";
+            if (color.R == 0 && color.G == 0 && color.B == 255) return "Blue";
+            if (color.R == 0 && color.G == 0 && color.B == 0) return "Black";
+            return "Custom";
         }
     }
-
 }
