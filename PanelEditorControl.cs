@@ -249,5 +249,21 @@ namespace keyviewer
         // 크기를 Size 타입으로 반환
         [Browsable(false)]
         public Size SelectedSize => new Size(SelectedWidth, SelectedHeight);
+
+        // 커스텀 이름 필드
+        [Browsable(true)]
+        [Category("Behavior")]
+        [Description("Custom display name for the key panel. Leave empty to use default key name.")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        [DefaultValue("")]
+        public string SelectedDisplayName
+        {
+            get => _txtDisplayName?.Text ?? "";
+            set
+            {
+                if (_txtDisplayName != null)
+                    _txtDisplayName.Text = value ?? "";
+            }
+        }
     }
 }

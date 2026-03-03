@@ -423,11 +423,15 @@ namespace keyviewer
                     var up = editor.SelectedUpColor;
                     var down = editor.SelectedDownColor;
                     var size = editor.SelectedSize;
-                    
+                    var displayName = editor.SelectedDisplayName; // 커스텀 이름 가져오기
+
                     loc.X = Math.Clamp(loc.X, 0, Math.Max(0, ClientSize.Width - size.Width));
                     loc.Y = Math.Clamp(loc.Y, 0, Math.Max(0, ClientSize.Height - size.Height));
 
                     var kp = _panelService.AddKeyPanel(editor.SelectedKey, down, up, loc, size);
+                    // DisplayName이 필요하면 설정 (생성자에서 기본값으로 설정됨)
+                    if (!string.IsNullOrEmpty(displayName))
+                        kp.DisplayName = displayName;
                     kp.BringToFront();
                 }
             };
@@ -648,12 +652,13 @@ namespace keyviewer
         private void OpenPanelEditor(KeyPanel kp)
         {
             if (kp == null) return;
-            using var editor = new PanelEditorForm(kp.Key, kp.UpColor, kp.DownColor);
+            using var editor = new PanelEditorForm(kp.Key, kp.UpColor, kp.DownColor, kp.DisplayName ?? "");
             if (editor.ShowDialog(this) == DialogResult.OK)
             {
                 kp.Key = editor.SelectedKey;
                 kp.UpColor = editor.SelectedUpColor;
                 kp.DownColor = editor.SelectedDownColor;
+                kp.DisplayName = editor.SelectedDisplayName; // 커스텀 이름 저장
                 kp.Panel.BackColor = kp.UpColor;
 
                 // 크기 변경 지원 (사용자가 수정한 경우)
