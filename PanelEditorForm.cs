@@ -44,7 +44,7 @@ namespace keyviewer
             Controls.Add(_editor);
             Controls.Add(_btnCancel);
             Controls.Add(_btnOk);
-            ClientSize = new Size(480, 320);
+            ClientSize = new Size(480, 380);
             AcceptButton = _btnOk;
 
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
