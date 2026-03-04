@@ -45,10 +45,15 @@ namespace keyviewer
             Controls.Add(_btnCancel);
             Controls.Add(_btnOk);
 
+<<<<<<< HEAD
+            ClientSize = new Size(480, 320);
+            AcceptButton = _btnOk;
+=======
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false; // 최대화 버튼 숨김
+            this.MaximizeBox = false; // �ִ�ȭ ��ư ����
 
             ClientSize = new Size(480, 380);
+>>>>>>> bbf7c4e915b6a75fe553e179b1a2a01fec8577a4
             CancelButton = _btnCancel;
 
             this.FormClosing += (s, e) =>
