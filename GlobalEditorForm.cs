@@ -1,4 +1,4 @@
-using System;
+Ôªøusing System;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -17,7 +17,7 @@ namespace keyviewer
         public string? SelectedBgImagePath => _editor.SelectedBgImagePath;
         public int SelectedOpacityPercent => _editor.SelectedOpacityPercent;
         public bool BackgroundTransparent => _editor.BackgroundTransparent;
-        public Color ChromaKeyColor => _editor.ChromaKeyColor; // √ﬂ∞°
+        public Color ChromaKeyColor => _editor.ChromaKeyColor;
 
         public GlobalEditorForm(Color initialUp, Color initialDown, Color initialBg, 
             string? initialBgImagePath, int initialKeyAlpha, int initialOpacityPercent, 
@@ -25,19 +25,31 @@ namespace keyviewer
         {
             InitializeComponent();
 
-            _editor = new GlobalEditorControl { Dock = DockStyle.Fill };
+            _editor = new GlobalEditorControl { Dock = DockStyle.Top };
             
-            var buttonPanel = new Panel { Dock = DockStyle.Bottom, Height = 35 };
-            _btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Width = 75, Height = 28, Left = 10, Top = 4 };
-            _btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Width = 75, Height = 28, Left = 95, Top = 4 };
-            
-            buttonPanel.Controls.Add(_btnOk);
-            buttonPanel.Controls.Add(_btnCancel);
+            // üÜï PanelEditorFormÍ≥º ÎèôÏùºÌïú Î≤ÑÌäº Ïä§ÌÉÄÏùº
+            _btnCancel = new Button
+            {
+                Text = "Cancel",
+                DialogResult = DialogResult.Cancel,
+                Size = new Size(380, 35),
+                Location = new Point(50, 295)
+            };
+            _btnOk = new Button
+            {
+                Text = "OK",
+                DialogResult = DialogResult.OK,
+                Size = new Size(380, 35),
+                Location = new Point(50, 335)
+            };
 
-            Controls.Add(buttonPanel);
+            _editor.Height = 290;
+
             Controls.Add(_editor);
+            Controls.Add(_btnCancel);
+            Controls.Add(_btnOk);
 
-            // √ ±‚∞™ ¿¸¥ﬁ
+            // Ï¥àÍ∏∞Í∞í Ï†ÑÎã¨
             _editor.SelectedUpColor = initialUp;
             _editor.SelectedDownColor = initialDown;
             _editor.SelectedBgColor = initialBg;
@@ -47,7 +59,7 @@ namespace keyviewer
             if (chromaKeyColor.HasValue)
                 _editor.ChromaKeyColor = chromaKeyColor.Value;
 
-            ClientSize = new Size(Math.Max(520, _editor.Width), 315 + 35); // ≥Ù¿Ã ¡ı∞°
+            ClientSize = new Size(480, 380);
             AcceptButton = _btnOk;
             CancelButton = _btnCancel;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -60,7 +72,7 @@ namespace keyviewer
         private void InitializeComponent()
         {
             SuspendLayout();
-            ClientSize = new Size(520, 350);
+            ClientSize = new Size(480, 380);
             Name = "GlobalEditorForm";
             ResumeLayout(false);
         }
