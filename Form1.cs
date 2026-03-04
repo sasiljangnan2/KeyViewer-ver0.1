@@ -243,7 +243,8 @@ namespace keyviewer
                     Y = kp.Panel.Location.Y,
                     Width = kp.Panel.Size.Width,
                     Height = kp.Panel.Size.Height,
-                    Name = kp.Panel.Name
+                    Name = kp.Panel.Name,
+                    DisplayName = kp.DisplayName // 🆕 커스텀 이름 저장
                 };
                 layout.Panels.Add(cfg);
             }
@@ -251,21 +252,6 @@ namespace keyviewer
             LayoutManager.SaveLayout(dlg.FileName, layout);
             RefreshLayoutList();
             _cbLayouts.SelectedItem = layout.Name;
-        }
-
-        private void DeleteSelectedLayout()
-        {
-            if (_cbLayouts.SelectedItem == null) return;
-            string name = _cbLayouts.SelectedItem.ToString()!;
-            string path = Path.Combine(_layoutsDir, name + ".json");
-            if (File.Exists(path))
-            {
-                if (MessageBox.Show(this, $"Delete layout '{name}'?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                {
-                    File.Delete(path);
-                    RefreshLayoutList();
-                }
-            }
         }
 
         // 런타임으로 추가된 패널을 제거(디자이너 패널은 유지)
@@ -389,14 +375,74 @@ namespace keyviewer
                     string path = Path.Combine(layoutsDir, dlg.SelectedLayoutFileName + ".json");
                     var layout = LayoutManager.LoadLayout(path);
                     if (layout == null) { MessageBox.Show(this, "레이아웃을 불러올 수 없습니다."); return; }
+                    
                     RemoveRuntimePanels();
+                    
+                    // 🆕 창 크기 복원
+                    if (layout.FormWidth > 0 && layout.FormHeight > 0)
+                    {
+                        this.ClientSize = new Size(layout.FormWidth, layout.FormHeight);
+                    }
+                    
+                    // 🆕 배경 설정 복원
+                    if (layout.BackgroundColorArgb != 0)
+                    {
+                        _currentBgColor = Color.FromArgb(layout.BackgroundColorArgb);
+                    }
+                    _currentBgImagePath = layout.BackgroundImagePath;
+                    _backgroundTransparent = layout.BackgroundTransparent;
+                    if (layout.ChromaKeyColorArgb != 0)
+                    {
+                        _chromaKeyColor = Color.FromArgb(layout.ChromaKeyColorArgb);
+                    }
+                    
+                    // 배경 적용
+                    if (_backgroundTransparent)
+                    {
+                        this.BackgroundImage?.Dispose();
+                        this.BackgroundImage = null;
+                        this.BackColor = _chromaKeyColor;
+                        this.TransparencyKey = _chromaKeyColor;
+                    }
+                    else
+                    {
+                        this.TransparencyKey = Color.Empty;
+                        this.BackColor = _currentBgColor;
+                        
+                        try
+                        {
+                            this.BackgroundImage?.Dispose();
+                            if (!string.IsNullOrEmpty(_currentBgImagePath) && File.Exists(_currentBgImagePath))
+                            {
+                                var img = Image.FromFile(_currentBgImagePath);
+                                this.BackgroundImage = new Bitmap(img);
+                                this.BackgroundImageLayout = ImageLayout.Stretch;
+                            }
+                            else
+                            {
+                                this.BackgroundImage = null;
+                            }
+                        }
+                        catch
+                        {
+                            this.BackgroundImage = null;
+                        }
+                    }
+                    
+                    // 🆕 투명도 복원
+                    if (layout.WindowOpacityPercent > 0)
+                    {
+                        this.Opacity = Math.Clamp(layout.WindowOpacityPercent, 1, 100) / 100.0;
+                    }
+                    
+                    // 키 패널 로드
                     var created = LayoutManager.ApplyLayout(layout, _panelService);
                     foreach (var kp in created)
                     {
                         kp.Panel.ContextMenuStrip = _contextMenuStrip;
                         kp.UpdateVisual();
 
-                        // 🆕 레이어드 윈도우 위치 동기화
+                        // 레이어드 윈도우 위치 동기화
                         if (!_obsCompatibilityMode)
                         {
                             var screenLoc = this.PointToScreen(kp.Panel.Location);
@@ -423,15 +469,20 @@ namespace keyviewer
                     var up = editor.SelectedUpColor;
                     var down = editor.SelectedDownColor;
                     var size = editor.SelectedSize;
-                    var displayName = editor.SelectedDisplayName; // 커스텀 이름 가져오기
+                    var displayName = editor.SelectedDisplayName;
 
                     loc.X = Math.Clamp(loc.X, 0, Math.Max(0, ClientSize.Width - size.Width));
                     loc.Y = Math.Clamp(loc.Y, 0, Math.Max(0, ClientSize.Height - size.Height));
 
                     var kp = _panelService.AddKeyPanel(editor.SelectedKey, down, up, loc, size);
-                    // DisplayName이 필요하면 설정 (생성자에서 기본값으로 설정됨)
+                    
+                    // 🆕 DisplayName 설정 및 UpdateVisual 호출
                     if (!string.IsNullOrEmpty(displayName))
+                    {
                         kp.DisplayName = displayName;
+                        kp.UpdateVisual(); // 텍스트 갱신
+                    }
+                    
                     kp.BringToFront();
                 }
             };
@@ -652,16 +703,24 @@ namespace keyviewer
         private void OpenPanelEditor(KeyPanel kp)
         {
             if (kp == null) return;
-            using var editor = new PanelEditorForm(kp.Key, kp.UpColor, kp.DownColor, kp.DisplayName ?? "");
+            
+            // 🆕 기존 크기도 함께 전달
+            using var editor = new PanelEditorForm(
+                kp.Key, 
+                kp.UpColor, 
+                kp.DownColor, 
+                kp.DisplayName ?? "", 
+                kp.Panel.Size); // 기존 크기 전달
+    
             if (editor.ShowDialog(this) == DialogResult.OK)
             {
                 kp.Key = editor.SelectedKey;
                 kp.UpColor = editor.SelectedUpColor;
                 kp.DownColor = editor.SelectedDownColor;
-                kp.DisplayName = editor.SelectedDisplayName; // 커스텀 이름 저장
+                kp.DisplayName = editor.SelectedDisplayName;
                 kp.Panel.BackColor = kp.UpColor;
 
-                // 크기 변경 지원 (사용자가 수정한 경우)
+                // 크기 변경 지원
                 var newSize = editor.SelectedSize;
                 if (kp.Panel.Size != newSize)
                 {
@@ -669,7 +728,7 @@ namespace keyviewer
                     kp.UpdateSize(newSize);
                 }
 
-                kp.UpdateVisual(); // 레이어드 윈도우 갱신
+                kp.UpdateVisual();
             }
         }
 

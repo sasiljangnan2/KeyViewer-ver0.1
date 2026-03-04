@@ -97,7 +97,11 @@ namespace keyviewer
                 // OBS 모드에서 텍스트를 그리기 위해 Paint 이벤트 처리
                 Panel.Paint += (s, e) =>
                 {
-                    string keyText = GetKeyDisplayName(Key);
+                    // 🆕 DisplayName이 있으면 사용, 없으면 기본 키 이름
+                    string keyText = !string.IsNullOrEmpty(DisplayName) 
+                        ? DisplayName 
+                        : GetKeyDisplayName(Key);
+                    
                     // 배경 먼저 지우기
                     e.Graphics.Clear(Panel.BackColor);
                     using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
@@ -266,8 +270,11 @@ namespace keyviewer
                     g.FillRectangle(bgBrush, 0, 0, w, h);
                 }
 
-                // 텍스트 그리기 - OBS 모드와 동일한 로직 사용
-                string keyText = GetKeyDisplayName(Key);
+                // 🆕 DisplayName이 있으면 사용, 없으면 기본 키 이름
+                string keyText = !string.IsNullOrEmpty(DisplayName) 
+                    ? DisplayName 
+                    : GetKeyDisplayName(Key);
+                
                 var rect = new Rectangle(0, 0, w, h);
                 using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
                 
