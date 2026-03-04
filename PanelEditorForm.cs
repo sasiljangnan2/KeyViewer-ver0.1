@@ -25,17 +25,31 @@ namespace keyviewer
 
             // UI 컨트롤 생성 로직
             _editor = new PanelEditorControl { Dock = DockStyle.Top };
-            _btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Dock = DockStyle.Bottom, Height = 40 };
-            _btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Dock = DockStyle.Bottom, Height = 40 };
+            _btnCancel = new Button
+            {
+                Text = "Cancel",
+                DialogResult = DialogResult.Cancel,
+                Size = new Size(380, 35),
+                Location = new Point(50, 295)
+            };
+            _btnOk = new Button
+            {
+                Text = "OK",
+                DialogResult = DialogResult.OK,
+                Size = new Size(380, 35),
+                Location = new Point(50, 335)
+            };
 
-            _editor.Height = 260;
+            _editor.Height = 290;
 
             Controls.Add(_editor);
             Controls.Add(_btnCancel);
             Controls.Add(_btnOk);
 
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false; // 최대화 버튼 숨김
 
-            ClientSize = new Size(480, 340);
+            ClientSize = new Size(480, 380);
             CancelButton = _btnCancel;
 
             this.FormClosing += (s, e) =>
