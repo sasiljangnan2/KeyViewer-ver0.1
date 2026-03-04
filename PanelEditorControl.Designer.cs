@@ -58,24 +58,24 @@ namespace keyviewer
             // cbKeys(ComboBox)
             _cbKeys.Location = new Point(10, 25);
             _cbKeys.Width = 220;
-            _cbKeys.Enabled = true; // 流立 涝仿 规瘤
+            _cbKeys.Enabled = false; // 流立 涝仿 规瘤
             _cbKeys.DropDownStyle = ComboBoxStyle.DropDown;
 
             // btnUpColor
             _btnUpColor.Location = new Point(10, 70);
-            _btnUpColor.Width = 120;
+            _btnUpColor.Size = new Size(120, 27);
             _btnUpColor.Text = "Up Color...";
             _btnUpColor.Click += BtnUpColor_Click;
 
             // previewUp
-            _previewUp.Location = new Point(160, 70);
+            _previewUp.Location = new Point(160, 73);
             _previewUp.Size = new Size(40, 24);
             _previewUp.BackColor = Color.Gray;
             _previewUp.BorderStyle = BorderStyle.FixedSingle;
 
             // btnDownColor
             _btnDownColor.Location = new Point(10, 105);
-            _btnDownColor.Width = 120;
+            _btnDownColor.Size = new Size(120, 27);
             _btnDownColor.Text = "Down Color...";
             _btnDownColor.Click += BtnDownColor_Click;
 

@@ -39,10 +39,10 @@ namespace keyviewer
             _btnRecord.Text = "단축키 설정";
             _btnRecord.BackColor = SystemColors.Control;
             _btnRecord.ForeColor = SystemColors.ControlText;
-            _cbKeys.BackColor = SystemColors.Window;
+            _cbKeys.BackColor = SystemColors.Control;
 
             //콤보박스 막혔을 경우 다시 활성화
-            if (_cbKeys != null) _cbKeys.Enabled = true;
+            if (_cbKeys != null) _cbKeys.Enabled = false;
             
             if (_lastRecordedKey != Keys.None)
             {

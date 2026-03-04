@@ -24,18 +24,17 @@ namespace keyviewer
 
             // UI 牧飘费 积己 肺流
             _editor = new PanelEditorControl { Dock = DockStyle.Top };
-            _btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Dock = DockStyle.Bottom };
-            _btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Dock = DockStyle.Bottom };
+            _btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Dock = DockStyle.Bottom, Height = 40 };
+            _btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Dock = DockStyle.Bottom, Height = 40 };
 
-            _editor.Height = 240;
+            _editor.Height = 260;
 
             Controls.Add(_editor);
             Controls.Add(_btnCancel);
             Controls.Add(_btnOk);
 
 
-            ClientSize = new Size(480, 320);
-            AcceptButton = _btnOk;
+            ClientSize = new Size(480, 340);
             CancelButton = _btnCancel;
 
             this.FormClosing += (s, e) =>
