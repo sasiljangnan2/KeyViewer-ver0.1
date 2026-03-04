@@ -15,6 +15,7 @@ namespace keyviewer
         public Color SelectedDownColor => _editor.SelectedDownColor;
         public int SelectedAlpha => _editor.SelectedAlpha;
         public Size SelectedSize => _editor.SelectedSize; // 새로 추가
+        public string SelectedDisplayName => _editor.SelectedDisplayName; // 커스텀 이름
 
         public PanelEditorForm()
         {
@@ -56,6 +57,15 @@ namespace keyviewer
             _editor.SelectedDownColor = downColor;
             _editor.SelectedAlpha = upColor.A;
             // 크기는 기존 패널 편집 시 변경하지 않도록 초기값 그대로 둠 (85x85)
+        }
+
+        public PanelEditorForm(Keys initialKey, Color upColor, Color downColor, string displayName) : this()
+        {
+            _editor.SelectedKey = initialKey;
+            _editor.SelectedUpColor = upColor;
+            _editor.SelectedDownColor = downColor;
+            _editor.SelectedAlpha = upColor.A;
+            _editor.SelectedDisplayName = displayName;
         }
 
         // 간단한 no-op InitializeComponent 구현: 디자이너 미사용 호스트 폼에서 에러 방지

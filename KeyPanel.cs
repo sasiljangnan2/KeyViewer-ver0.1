@@ -72,6 +72,7 @@ namespace keyviewer
         public Keys Key { get; set; }
         public Color DownColor { get; set; }
         public Color UpColor { get; set; }
+        public string? DisplayName { get; set; } // 커스텀 이름 (nil이면 기본 키 이름 사용)
 
         private bool _isKeyDown = false;
         private bool _obsCompatibilityMode = false; // OBS 호환 모드
@@ -84,11 +85,29 @@ namespace keyviewer
             UpColor = upColor;
             _obsCompatibilityMode = obsCompatibilityMode;
 
+            // DisplayName을 기본 키 이름으로 초기화
+            DisplayName = GetKeyDisplayName(key);
+
             if (_obsCompatibilityMode)
             {
                 // OBS 호환 모드: 일반 패널 사용
                 Panel.Visible = true;
                 Panel.BackColor = upColor;
+
+                // OBS 모드에서 텍스트를 그리기 위해 Paint 이벤트 처리
+                Panel.Paint += (s, e) =>
+                {
+                    string keyText = GetKeyDisplayName(Key);
+                    // 배경 먼저 지우기
+                    e.Graphics.Clear(Panel.BackColor);
+                    using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                    int fontSize = Math.Max(8, Math.Min(Panel.Width, Panel.Height) / 3);
+                    using var font = new Font("Arial", fontSize, FontStyle.Bold);
+                    Color textColor = GetContrastColor(Color.FromArgb(255, Panel.BackColor));
+                    using var brush = new SolidBrush(textColor);
+                    e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                    e.Graphics.DrawString(keyText, font, brush, Panel.ClientRectangle, sf);
+                };
             }
             else
             {
@@ -220,12 +239,13 @@ namespace keyviewer
         {
             // 변수를 메서드 최상단에서 한 번만 선언
             Color currentColor = _isKeyDown ? DownColor : UpColor;
-            
+
             if (_obsCompatibilityMode)
             {
                 // OBS 모드: 패널 직접 업데이트
                 Panel.BackColor = currentColor;
-                Panel.Invalidate();
+                Panel.Invalidate(true); // true를 전달하여 자식 컨트롤도 함께 무효화
+                Panel.Update(); // 즉시 다시 그리기
                 return;
             }
 
@@ -340,6 +360,10 @@ namespace keyviewer
 
         private string GetKeyDisplayName(Keys key)
         {
+            // 커스텀 이름이 있으면 우선 사용
+            if (!string.IsNullOrWhiteSpace(DisplayName))
+                return DisplayName;
+
             return key switch
             {
                 Keys.LControlKey or Keys.RControlKey or Keys.ControlKey => "Ctrl",

@@ -20,6 +20,8 @@ namespace keyviewer
         private ColorDialog _colorDialog;
         private Button _btnRecord; // 녹화 시작 버튼
         private Label _lblCurrentKeyInfo; // 현재 입력 상태 표시 라벨
+        private TextBox _txtDisplayName; // 커스텀 이름 입력 필드
+        private Label _lblDisplayName; // 커스텀 이름 라벨
 
         private void InitializeComponent()
         {
@@ -37,6 +39,8 @@ namespace keyviewer
             _colorDialog = new ColorDialog();
             _btnRecord = new Button();
             _lblCurrentKeyInfo = new Label();
+            _txtDisplayName = new TextBox();
+            _lblDisplayName = new Label();
 
             // 녹화 시작 버튼 설정
             _btnRecord.Location = new Point(235, 23);
@@ -51,7 +55,7 @@ namespace keyviewer
 
             // 전체 컨트롤 크기 확장 (버튼이 보일 수 있게)
             this.Size = new Size(460, 240);
-            this.Height = 250;
+            this.Height = 280;
             this.Controls.Add(_btnRecord);
             this.Controls.Add(_lblCurrentKeyInfo);
 
@@ -125,6 +129,17 @@ namespace keyviewer
             _numHeight.Maximum = 500;
             _numHeight.Value = 85; // 기본값 85
 
+            // lblDisplayName
+            _lblDisplayName.Location = new Point(10, 220);
+            _lblDisplayName.Width = 100;
+            _lblDisplayName.Text = "Display Name:";
+            _lblDisplayName.TextAlign = ContentAlignment.MiddleLeft;
+
+            // txtDisplayName
+            _txtDisplayName.Location = new Point(120, 220);
+            _txtDisplayName.Width = 310;
+            _txtDisplayName.Text = "";
+
             // Load 이벤트
             this.Load += PanelEditorControl_Load;
 
@@ -136,6 +151,7 @@ namespace keyviewer
                 _tbAlpha, _lblAlpha,
                 _lblWidth, _numWidth,
                 _lblHeight, _numHeight,
+                _lblDisplayName, _txtDisplayName,
                 _btnRecord,
                 _lblCurrentKeyInfo
             });
