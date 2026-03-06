@@ -194,7 +194,10 @@ namespace keyviewer
         // 레이아웃 목록 로드
         private void RefreshLayoutList()
         {
-            _cbLayouts?.Items.Clear();
+            // 🔥 _cbLayouts가 null이면 아무것도 안 함
+            if (_cbLayouts == null) return;
+            
+            _cbLayouts.Items.Clear();
             foreach (var file in Directory.GetFiles(_layoutsDir, "*.json"))
             {
                 _cbLayouts.Items.Add(Path.GetFileNameWithoutExtension(file));
@@ -214,48 +217,54 @@ namespace keyviewer
             };
             if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
-            var layout = new KeyLayout 
-            { 
-                Name = Path.GetFileNameWithoutExtension(dlg.FileName),
-                
-                // 🆕 창 크기 저장
-                FormWidth = this.ClientSize.Width,
-                FormHeight = this.ClientSize.Height,
-                
-                // 🆕 배경 설정 저장
-                BackgroundColorArgb = _currentBgColor.ToArgb(),
-                BackgroundImagePath = _currentBgImagePath,
-                BackgroundTransparent = _backgroundTransparent,
-                ChromaKeyColorArgb = _chromaKeyColor.ToArgb(),
-                
-                // 🆕 투명도 저장
-                WindowOpacityPercent = (int)(this.Opacity * 100)
-            };
-            
-            foreach (var kp in _keyPanels)
+            try
             {
-                var cfg = new KeyPanelConfig
-                {
-                    Key = kp.Key,
-                    DownArgb = kp.DownColor.ToArgb(),
-                    UpArgb = kp.UpColor.ToArgb(),
-                    X = kp.Panel.Location.X,
-                    Y = kp.Panel.Location.Y,
-                    Width = kp.Panel.Size.Width,
-                    Height = kp.Panel.Size.Height,
-                    Name = kp.Panel.Name,
-                    DisplayName = kp.DisplayName,
-                    BorderEnabled = kp.BorderEnabled,
-                    BorderColorArgb = kp.BorderColor.ToArgb(),
-                    BorderWidth = kp.BorderWidth,
-                    CornerRadius = kp.CornerRadius // 🆕
+                var layout = new KeyLayout 
+                { 
+                    Name = Path.GetFileNameWithoutExtension(dlg.FileName),
+                    FormWidth = this.ClientSize.Width,
+                    FormHeight = this.ClientSize.Height,
+                    BackgroundColorArgb = _currentBgColor.ToArgb(),
+                    BackgroundImagePath = _currentBgImagePath,
+                    BackgroundTransparent = _backgroundTransparent,
+                    ChromaKeyColorArgb = _chromaKeyColor.ToArgb(),
+                    WindowOpacityPercent = (int)(this.Opacity * 100)
                 };
-                layout.Panels.Add(cfg);
-            }
+        
+                foreach (var kp in _keyPanels)
+                {
+                    var cfg = new KeyPanelConfig
+                    {
+                        Key = kp.Key,
+                        DownArgb = kp.DownColor.ToArgb(),
+                        UpArgb = kp.UpColor.ToArgb(),
+                        X = kp.Panel.Location.X,
+                        Y = kp.Panel.Location.Y,
+                        Width = kp.Panel.Size.Width,
+                        Height = kp.Panel.Size.Height,
+                        Name = kp.Panel.Name ?? $"panel_{kp.Key}",
+                        DisplayName = kp.DisplayName,
+                        BorderEnabled = kp.BorderEnabled,
+                        BorderColorArgb = kp.BorderColor.ToArgb(),
+                        BorderWidth = kp.BorderWidth,
+                        CornerRadius = kp.CornerRadius
+                    };
+                    layout.Panels.Add(cfg);
+                }
 
-            LayoutManager.SaveLayout(dlg.FileName, layout);
-            RefreshLayoutList();
-            _cbLayouts.SelectedItem = layout.Name;
+                LayoutManager.SaveLayout(dlg.FileName, layout);
+                RefreshLayoutList();
+        
+                MessageBox.Show(this, $"레이아웃이 저장되었습니다.\n{dlg.FileName}", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, 
+                    $"레이아웃 저장 실패:\n\n{ex.Message}", 
+                    "Error", 
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Error);
+            }
         }
 
         // 런타임으로 추가된 패널을 제거(디자이너 패널은 유지)
