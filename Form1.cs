@@ -79,13 +79,12 @@ namespace keyviewer
             InitializeComponent();
 
             // OBS 호환 모드 활성화 여부 설정
-            _obsCompatibilityMode = true; // 레이어드 윈도우 모드로 변경
+            _obsCompatibilityMode = false; // 기본값
 
             _currentBgColor = this.BackColor;
             Directory.CreateDirectory(_layoutsDir);
             InitializeContextMenu();
 
-            // OBS 모드를 서비스에 전달
             _panelService = new KeyPanelService(this, _defaultColor,
                 Panel_MouseDown, Panel_MouseMove, Panel_MouseUp,
                 _contextMenuStrip, _obsCompatibilityMode);
@@ -97,20 +96,38 @@ namespace keyviewer
 
             this.ContextMenuStrip = _contextMenuStrip;
 
+            // 🆕 이벤트 핸들러를 메서드로 분리하여 관리
+            SetupEventHandlers();
+
+            if (_keyPanels.Count == 0)
+            {
+                var testKey = _panelService.AddKeyPanel(
+                    Keys.Space,
+                    Color.Red,
+                    Color.Gray,
+                    new Point(10, 10),
+                    new Size(85, 85)
+                );
+                testKey.UpdateVisual();
+            }
+
+            this.Shown += OnFormShown;
+        }
+
+        // 🆕 이벤트 핸들러 설정 메서드
+        private void SetupEventHandlers()
+        {
             if (!_obsCompatibilityMode)
             {
-                // 레이어드 윈도우 모드에서만 동기화 필요
-                this.LocationChanged += (s, e) => SyncLayeredWindows();
-                this.SizeChanged += (s, e) => SyncLayeredWindows();
-                this.VisibleChanged += (s, e) => SyncLayeredWindowsVisibility();
+                this.LocationChanged += SyncLayeredWindows;
+                this.SizeChanged += SyncLayeredWindows;
+                this.VisibleChanged += SyncLayeredWindowsVisibility;
 
-                // 🆕 폼이 로드된 후 레이어드 윈도우 동기화
                 this.Load += (s, e) =>
                 {
                     SyncLayeredWindows();
                     SyncLayeredWindowsVisibility();
 
-                    // TopMost 설정
                     foreach (var kp in _keyPanels)
                     {
                         if (kp.LayeredWindow != null && !kp.LayeredWindow.IsDisposed)
@@ -120,7 +137,6 @@ namespace keyviewer
                     }
                 };
 
-                // 🆕 폼이 활성화될 때 레이어드 윈도우도 앞으로
                 this.Activated += (s, e) =>
                 {
                     foreach (var kp in _keyPanels)
@@ -132,46 +148,34 @@ namespace keyviewer
                     }
                 };
             }
-
-            // 🆕 디버깅: 키 패널이 없으면 기본 키 추가
-            if (_keyPanels.Count == 0)
-            {
-                // 테스트용 기본 키 추가
-                var testKey = _panelService.AddKeyPanel(
-                    Keys.Space,
-                    Color.Red,
-                    Color.Gray,
-                    new Point(10, 10),
-                    new Size(85, 85)
-                );
-                testKey.UpdateVisual();
-            }
-
-            this.Shown += (s, e) =>
-            {
-                // 0.5초 후 강제로 레이어드 윈도우 표시
-                System.Threading.Tasks.Task.Delay(500).ContinueWith(_ =>
-                {
-                    this.BeginInvoke(new Action(() =>
-                    {
-                        foreach (var kp in _keyPanels)
-                        {
-                            if (kp.LayeredWindow != null && !kp.LayeredWindow.IsDisposed)
-                            {
-                                kp.LayeredWindow.Show();
-                                kp.LayeredWindow.BringToFront();
-                                kp.UpdateVisual();
-                                System.Diagnostics.Debug.WriteLine(
-                                    $"Forced show: {kp.Key} at {kp.LayeredWindow.Location}");
-                            }
-                        }
-                    }));
-                });
-            };
         }
 
-        // 레이어드 윈도우 위치 동기화
-        private void SyncLayeredWindows()
+        // 🆕 Shown 이벤트 핸들러
+        private void OnFormShown(object? sender, EventArgs e)
+        {
+            if (_obsCompatibilityMode) return;
+            
+            System.Threading.Tasks.Task.Delay(500).ContinueWith(_ =>
+            {
+                this.BeginInvoke(new Action(() =>
+                {
+                    foreach (var kp in _keyPanels)
+                    {
+                        if (kp.LayeredWindow != null && !kp.LayeredWindow.IsDisposed)
+                        {
+                            kp.LayeredWindow.Show();
+                            kp.LayeredWindow.BringToFront();
+                            kp.UpdateVisual();
+                            System.Diagnostics.Debug.WriteLine(
+                                $"Forced show: {kp.Key} at {kp.LayeredWindow.Location}");
+                        }
+                    }
+                }));
+            });
+        }
+
+        // 레이어드 윈도우 위치 동기화 (이벤트 핸들러 시그니처로 변경)
+        private void SyncLayeredWindows(object? sender, EventArgs e)
         {
             foreach (var kp in _keyPanels)
             {
@@ -180,7 +184,13 @@ namespace keyviewer
             }
         }
 
-        private void SyncLayeredWindowsVisibility()
+        // 오버로드 추가 (파라미터 없는 버전)
+        private void SyncLayeredWindows()
+        {
+            SyncLayeredWindows(null, EventArgs.Empty);
+        }
+
+        private void SyncLayeredWindowsVisibility(object? sender, EventArgs e)
         {
             foreach (var kp in _keyPanels)
             {
@@ -189,6 +199,12 @@ namespace keyviewer
                 else
                     kp.Hide();
             }
+        }
+
+        // 오버로드 추가
+        private void SyncLayeredWindowsVisibility()
+        {
+            SyncLayeredWindowsVisibility(null, EventArgs.Empty);
         }
 
         // 레이아웃 목록 로드
@@ -228,7 +244,8 @@ namespace keyviewer
                     BackgroundImagePath = _currentBgImagePath,
                     BackgroundTransparent = _backgroundTransparent,
                     ChromaKeyColorArgb = _chromaKeyColor.ToArgb(),
-                    WindowOpacityPercent = (int)(this.Opacity * 100)
+                    WindowOpacityPercent = (int)(this.Opacity * 100),
+                    OBSCompatibilityMode = _obsCompatibilityMode // 🆕
                 };
         
                 foreach (var kp in _keyPanels)
@@ -369,11 +386,36 @@ namespace keyviewer
             toggleTopMost.Click += (s, e) =>
             {
                 this.TopMost = toggleTopMost.Checked;
-                // 레이어드 윈도우도 TopMost 동기화
                 foreach (var kp in _keyPanels)
                 {
                     if (kp.LayeredWindow != null && !kp.LayeredWindow.IsDisposed)
                         kp.LayeredWindow.TopMost = this.TopMost;
+                }
+            };
+
+            // 🆕 OBS 호환 모드 토글
+            var toggleOBSMode = new ToolStripMenuItem("OBS Compatibility Mode");
+            toggleOBSMode.CheckOnClick = true;
+            toggleOBSMode.Checked = _obsCompatibilityMode;
+            toggleOBSMode.Click += (s, e) =>
+            {
+                bool newMode = toggleOBSMode.Checked;
+                if (newMode == _obsCompatibilityMode) return; // 변경 없음
+                
+                var result = MessageBox.Show(this,
+                    $"모드를 {(newMode ? "OBS 호환" : "레이어드 윈도우")}로 변경하시겠습니까?\n\n" +
+                    "모든 키 패널이 다시 생성됩니다.",
+                    "모드 변경",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+                
+                if (result == DialogResult.Yes)
+                {
+                    SwitchMode(newMode);
+                }
+                else
+                {
+                    toggleOBSMode.Checked = _obsCompatibilityMode; // 원래대로
                 }
             };
 
@@ -389,15 +431,55 @@ namespace keyviewer
                     var layout = LayoutManager.LoadLayout(path);
                     if (layout == null) { MessageBox.Show(this, "레이아웃을 불러올 수 없습니다."); return; }
                     
-                    RemoveRuntimePanels();
-                    
-                    // 🆕 창 크기 복원
+                    // 🔥 OBS 모드가 다르면 먼저 모드 전환 (패널 상태는 유지 안 함)
+                    if (layout.OBSCompatibilityMode != _obsCompatibilityMode)
+                    {
+                        // 모든 패널 제거
+                        foreach (var kp in _keyPanels.ToList())
+                        {
+                            kp.Dispose();
+                            if (kp.Panel.Parent != null)
+                                Controls.Remove(kp.Panel);
+                        }
+                        _keyPanels.Clear();
+                        
+                        // 이벤트 핸들러 제거
+                        if (!_obsCompatibilityMode)
+                        {
+                            this.LocationChanged -= SyncLayeredWindows;
+                            this.SizeChanged -= SyncLayeredWindows;
+                            this.VisibleChanged -= SyncLayeredWindowsVisibility;
+                        }
+                        
+                        // 모드 변경
+                        _obsCompatibilityMode = layout.OBSCompatibilityMode;
+                        
+                        // KeyPanelService 재생성
+                        _panelService = new KeyPanelService(this, _defaultColor,
+                            Panel_MouseDown, Panel_MouseMove, Panel_MouseUp,
+                            _contextMenuStrip, _obsCompatibilityMode);
+                        
+                        // 이벤트 핸들러 추가
+                        if (!_obsCompatibilityMode)
+                        {
+                            this.LocationChanged += SyncLayeredWindows;
+                            this.SizeChanged += SyncLayeredWindows;
+                            this.VisibleChanged += SyncLayeredWindowsVisibility;
+                        }
+                    }
+                    else
+                    {
+                        // 같은 모드면 기존 패널만 제거
+                        RemoveRuntimePanels();
+                    }
+        
+                    // 창 크기 복원
                     if (layout.FormWidth > 0 && layout.FormHeight > 0)
                     {
                         this.ClientSize = new Size(layout.FormWidth, layout.FormHeight);
                     }
-                    
-                    // 🆕 배경 설정 복원
+        
+                    // 배경 설정 복원
                     if (layout.BackgroundColorArgb != 0)
                     {
                         _currentBgColor = Color.FromArgb(layout.BackgroundColorArgb);
@@ -408,7 +490,7 @@ namespace keyviewer
                     {
                         _chromaKeyColor = Color.FromArgb(layout.ChromaKeyColorArgb);
                     }
-                    
+        
                     // 배경 적용
                     if (_backgroundTransparent)
                     {
@@ -442,7 +524,7 @@ namespace keyviewer
                         }
                     }
                     
-                    // 🆕 투명도 복원
+                    // 투명도 복원
                     if (layout.WindowOpacityPercent > 0)
                     {
                         this.Opacity = Math.Clamp(layout.WindowOpacityPercent, 1, 100) / 100.0;
@@ -455,12 +537,18 @@ namespace keyviewer
                         kp.Panel.ContextMenuStrip = _contextMenuStrip;
                         kp.UpdateVisual();
 
-                        // 레이어드 윈도우 위치 동기화
+                        // 🔥 모드에 따라 다르게 처리
                         if (!_obsCompatibilityMode)
                         {
                             var screenLoc = this.PointToScreen(kp.Panel.Location);
                             kp.UpdatePosition(screenLoc);
                             kp.Show();
+                        }
+                        else
+                        {
+                            // OBS 모드: 패널 표시
+                            kp.Panel.Visible = true;
+                            kp.Panel.BringToFront();
                         }
                     }
                 }
@@ -642,7 +730,7 @@ namespace keyviewer
                     }
                 }
             };
-
+             
             var debugItem = new ToolStripMenuItem("Debug: Show Window Info");
             debugItem.Click += (s, e) =>
             {
@@ -675,6 +763,7 @@ namespace keyviewer
 
             // 기본 메뉴 항목 추가
             _contextMenuStrip.Items.Add(toggleTopMost);
+            _contextMenuStrip.Items.Add(toggleOBSMode); // 🆕 OBS 모드 토글
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(layoutsItem);
             _contextMenuStrip.Items.Add(saveLayoutItem);
@@ -767,6 +856,89 @@ namespace keyviewer
 
                 kp.UpdateVisual();
             }
+        }
+
+        // OBS 모드 전환
+        private void SwitchMode(bool obsMode)
+        {
+            // 현재 패널 상태 저장
+            var panelStates = new List<(Keys Key, Color Up, Color Down, Point Loc, Size Size, 
+                string? DisplayName, bool BorderEnabled, Color BorderColor, int BorderWidth, int CornerRadius)>();
+            
+            foreach (var kp in _keyPanels.ToList())
+            {
+                panelStates.Add((
+                    kp.Key,
+                    kp.UpColor,
+                    kp.DownColor,
+                    kp.Panel.Location,
+                    kp.Panel.Size,
+                    kp.DisplayName,
+                    kp.BorderEnabled,
+                    kp.BorderColor,
+                    kp.BorderWidth,
+                    kp.CornerRadius
+                ));
+            }
+
+            // 모든 패널 제거
+            foreach (var kp in _keyPanels.ToList())
+            {
+                kp.Dispose();
+                if (kp.Panel.Parent != null)
+                    Controls.Remove(kp.Panel);
+            }
+            _keyPanels.Clear();
+
+            // 🔥 이벤트 핸들러 제거 (레이어드 윈도우 모드였던 경우)
+            if (!_obsCompatibilityMode)
+            {
+                this.LocationChanged -= SyncLayeredWindows;
+                this.SizeChanged -= SyncLayeredWindows;
+                this.VisibleChanged -= SyncLayeredWindowsVisibility;
+            }
+
+            // 모드 변경
+            _obsCompatibilityMode = obsMode;
+            
+            // KeyPanelService 재생성
+            _panelService = new KeyPanelService(this, _defaultColor,
+                Panel_MouseDown, Panel_MouseMove, Panel_MouseUp,
+                _contextMenuStrip, _obsCompatibilityMode);
+
+            // 🔥 이벤트 리스너 재설정
+            if (!_obsCompatibilityMode)
+            {
+                this.LocationChanged += SyncLayeredWindows;
+                this.SizeChanged += SyncLayeredWindows;
+                this.VisibleChanged += SyncLayeredWindowsVisibility;
+            }
+
+            // 패널 복원
+            foreach (var state in panelStates)
+            {
+                var kp = _panelService.AddKeyPanel(state.Key, state.Down, state.Up, state.Loc, state.Size);
+                kp.DisplayName = state.DisplayName;
+                kp.BorderEnabled = state.BorderEnabled;
+                kp.BorderColor = state.BorderColor;
+                kp.BorderWidth = state.BorderWidth;
+                kp.CornerRadius = state.CornerRadius;
+                kp.Panel.ContextMenuStrip = _contextMenuStrip;
+                kp.UpdateVisual();
+
+                if (!_obsCompatibilityMode)
+                {
+                    var screenLoc = this.PointToScreen(kp.Panel.Location);
+                    kp.UpdatePosition(screenLoc);
+                    kp.Show();
+                }
+            }
+
+            MessageBox.Show(this, 
+                $"모드가 {(obsMode ? "OBS 호환" : "레이어드 윈도우")}로 변경되었습니다.", 
+                "모드 변경 완료", 
+                MessageBoxButtons.OK, 
+                MessageBoxIcon.Information);
         }
 
         // 헬퍼 메서드 추가

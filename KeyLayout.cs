@@ -45,5 +45,8 @@ namespace keyviewer
         
         // 투명도 설정
         public int WindowOpacityPercent { get; set; }
+        
+        // 🆕 OBS 모드 설정
+        public bool OBSCompatibilityMode { get; set; }
     }
 }
