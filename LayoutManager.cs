@@ -39,12 +39,23 @@ namespace keyviewer
                 var size = new System.Drawing.Size(cfg.Width > 0 ? cfg.Width : 85, cfg.Height > 0 ? cfg.Height : 85);
                 var kp = panelService.AddKeyPanel(cfg.Key, down, up, loc, size);
                 
-                // 🆕 DisplayName 복원
                 if (!string.IsNullOrEmpty(cfg.DisplayName))
                 {
                     kp.DisplayName = cfg.DisplayName;
-                    kp.UpdateVisual(); // 텍스트 갱신
                 }
+                
+                // 테두리 복원
+                kp.BorderEnabled = cfg.BorderEnabled;
+                if (cfg.BorderColorArgb != 0)
+                {
+                    kp.BorderColor = Color.FromArgb(cfg.BorderColorArgb);
+                }
+                kp.BorderWidth = cfg.BorderWidth > 0 ? cfg.BorderWidth : 2;
+                
+                // 🆕 모서리 반경 복원
+                kp.CornerRadius = cfg.CornerRadius;
+                
+                kp.UpdateVisual();
                 
                 created.Add(kp);
             }

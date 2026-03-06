@@ -18,6 +18,14 @@ namespace keyviewer
         public int Height { get; set; }
         public string? Name { get; set; }
         public string? DisplayName { get; set; } // 🆕 커스텀 표시 이름
+        
+        // 테두리 설정
+        public bool BorderEnabled { get; set; }
+        public int BorderColorArgb { get; set; }
+        public int BorderWidth { get; set; } = 2;
+        
+        // 🆕 모서리 반경
+        public int CornerRadius { get; set; } = 0;
     }
 
     public class KeyLayout

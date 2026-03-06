@@ -16,6 +16,10 @@ namespace keyviewer
         public int SelectedAlpha => _editor.SelectedAlpha;
         public Size SelectedSize => _editor.SelectedSize;
         public string SelectedDisplayName => _editor.SelectedDisplayName;
+        public bool BorderEnabled => _editor.BorderEnabled;
+        public Color BorderColor => _editor.BorderColor;
+        public int BorderWidth => _editor.BorderWidth;
+        public int CornerRadius => _editor.CornerRadius; // 🆕
 
         public PanelEditorForm()
         {
@@ -28,31 +32,31 @@ namespace keyviewer
             {
                 Text = "Cancel",
                 DialogResult = DialogResult.Cancel,
-                Size = new Size(380, 35),
-                Location = new Point(50, 295)
+                Size = new Size(400, 35),
+                Location = new Point(50, 265)
             };
             _btnOk = new Button
             {
                 Text = "OK",
                 DialogResult = DialogResult.OK,
-                Size = new Size(380, 35),
-                Location = new Point(50, 335)
+                Size = new Size(400, 35),
+                Location = new Point(50, 305)
             };
 
-            _editor.Height = 290;
+            _editor.Height = 255;
 
             Controls.Add(_editor);
             Controls.Add(_btnCancel);
             Controls.Add(_btnOk);
-            ClientSize = new Size(480, 380);
-            AcceptButton = _btnOk;
-
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false; 
-
             
-
+            ClientSize = new Size(500, 350);
+            AcceptButton = _btnOk;
             CancelButton = _btnCancel;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            StartPosition = FormStartPosition.CenterParent;
+            Text = "Panel Settings";
 
             this.FormClosing += (s, e) =>
             {
@@ -87,10 +91,43 @@ namespace keyviewer
             _editor.SelectedHeight = size.Height;
         }
 
+        // 🆕 테두리 포함 생성자
+        public PanelEditorForm(Keys initialKey, Color upColor, Color downColor, string displayName, Size size, 
+            bool borderEnabled, Color borderColor, int borderWidth) : this()
+        {
+            _editor.SelectedKey = initialKey;
+            _editor.SelectedUpColor = upColor;
+            _editor.SelectedDownColor = downColor;
+            _editor.SelectedAlpha = upColor.A;
+            _editor.SelectedDisplayName = displayName;
+            _editor.SelectedWidth = size.Width;
+            _editor.SelectedHeight = size.Height;
+            _editor.BorderEnabled = borderEnabled;
+            _editor.BorderColor = borderColor;
+            _editor.BorderWidth = borderWidth;
+        }
+
+        // 🆕 코너 반경 포함 생성자
+        public PanelEditorForm(Keys initialKey, Color upColor, Color downColor, string displayName, Size size, 
+            bool borderEnabled, Color borderColor, int borderWidth, int cornerRadius) : this()
+        {
+            _editor.SelectedKey = initialKey;
+            _editor.SelectedUpColor = upColor;
+            _editor.SelectedDownColor = downColor;
+            _editor.SelectedAlpha = upColor.A;
+            _editor.SelectedDisplayName = displayName;
+            _editor.SelectedWidth = size.Width;
+            _editor.SelectedHeight = size.Height;
+            _editor.BorderEnabled = borderEnabled;
+            _editor.BorderColor = borderColor;
+            _editor.BorderWidth = borderWidth;
+            _editor.CornerRadius = cornerRadius; // 🆕
+        }
+
         private void InitializeComponent()
         {
             SuspendLayout();
-            ClientSize = new Size(284, 261);
+            ClientSize = new Size(500, 350);
             Name = "PanelEditorForm";
             Load += PanelEditorForm_Load;
             ResumeLayout(false);

@@ -77,6 +77,11 @@ namespace keyviewer
         private bool _isKeyDown = false;
         private bool _obsCompatibilityMode = false; // OBS 호환 모드
 
+        public bool BorderEnabled { get; set; }
+        public Color BorderColor { get; set; } = Color.Black;
+        public int BorderWidth { get; set; } = 2;
+        public int CornerRadius { get; set; } = 0; // 기본값: 사각형
+
         public KeyPanel(Panel panel, Keys key, Color downColor, Color upColor, bool obsCompatibilityMode = false)
         {
             Panel = panel ?? throw new System.ArgumentNullException(nameof(panel));
@@ -97,19 +102,72 @@ namespace keyviewer
                 // OBS 모드에서 텍스트를 그리기 위해 Paint 이벤트 처리
                 Panel.Paint += (s, e) =>
                 {
-                    // 🆕 DisplayName이 있으면 사용, 없으면 기본 키 이름
+                    // 고품질 렌더링 설정
+                    e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    e.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                    e.Graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                    e.Graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                    e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+                    
                     string keyText = !string.IsNullOrEmpty(DisplayName) 
                         ? DisplayName 
                         : GetKeyDisplayName(Key);
                     
-                    // 배경 먼저 지우기
                     e.Graphics.Clear(Panel.BackColor);
-                    using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                    
+                    var rect = Panel.ClientRectangle;
+                    
+                    // 🆕 테두리를 고려한 정확한 사각형 계산
+                    float halfBorder = BorderEnabled ? BorderWidth / 2.0f : 0f;
+                    RectangleF drawRect = new RectangleF(
+                        halfBorder, 
+                        halfBorder, 
+                        Panel.Width - BorderWidth, 
+                        Panel.Height - BorderWidth);
+                    
+                    // 둥글은 모서리 처리
+                    if (CornerRadius > 0)
+                    {
+                        using var path = GetRoundedRectPathF(drawRect, CornerRadius);
+                        
+                        using (var bgBrush = new SolidBrush(Panel.BackColor))
+                        {
+                            e.Graphics.FillPath(bgBrush, path);
+                        }
+                        
+                        if (BorderEnabled)
+                        {
+                            using var pen = new Pen(BorderColor, BorderWidth);
+                            e.Graphics.DrawPath(pen, path);
+                        }
+                        
+                        Panel.Region = new Region(path);
+                    }
+                    else
+                    {
+                        if (BorderEnabled)
+                        {
+                            using var pen = new Pen(BorderColor, BorderWidth);
+                            e.Graphics.DrawRectangle(pen, halfBorder, halfBorder, 
+                                Panel.Width - BorderWidth, Panel.Height - BorderWidth);
+                        }
+                        
+                        Panel.Region = null;
+                    }
+                    
+                    // 텍스트 그리기
+                    using var sf = new StringFormat 
+                    { 
+                        Alignment = StringAlignment.Center, 
+                        LineAlignment = StringAlignment.Center,
+                        FormatFlags = StringFormatFlags.NoWrap
+                    };
+                    
                     int fontSize = Math.Max(8, Math.Min(Panel.Width, Panel.Height) / 3);
-                    using var font = new Font("Arial", fontSize, FontStyle.Bold);
+                    using var font = new Font("Arial", fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
                     Color textColor = GetContrastColor(Color.FromArgb(255, Panel.BackColor));
                     using var brush = new SolidBrush(textColor);
-                    e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                    
                     e.Graphics.DrawString(keyText, font, brush, Panel.ClientRectangle, sf);
                 };
             }
@@ -238,22 +296,40 @@ namespace keyviewer
             }
         }
 
-        // 레이어드 윈도우를 현재 상태(색상, 키 텍스트)로 업데이트
+        // 둥근 사각형 경로 생성 헬퍼 메서드
+        private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle bounds, int radius)
+        {
+            int diameter = radius * 2;
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+
+            if (radius == 0)
+            {
+                path.AddRectangle(bounds);
+                return path;
+            }
+
+            path.AddArc(bounds.X, bounds.Y, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Y, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.X, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+
+            return path;
+        }
+
+        // UpdateVisual() 메서드 수정
         public void UpdateVisual()
         {
-            // 변수를 메서드 최상단에서 한 번만 선언
             Color currentColor = _isKeyDown ? DownColor : UpColor;
 
             if (_obsCompatibilityMode)
             {
-                // OBS 모드: 패널 직접 업데이트
                 Panel.BackColor = currentColor;
-                Panel.Invalidate(true); // true를 전달하여 자식 컨트롤도 함께 무효화
-                Panel.Update(); // 즉시 다시 그리기
+                Panel.Invalidate(true);
+                Panel.Update();
                 return;
             }
 
-            // 레이어드 윈도우 모드: 기존 로직
             if (_layeredWindow == null || _layeredWindow.IsDisposed) return;
 
             int w = Math.Max(1, _layeredWindow.Width);
@@ -262,34 +338,113 @@ namespace keyviewer
             using var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
             using (var g = Graphics.FromImage(bmp))
             {
+                // 고품질 렌더링 설정
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+                
                 g.Clear(Color.Transparent);
 
-                // 배경 색 (알파 포함)
-                using (var bgBrush = new SolidBrush(currentColor))
+                // 🆕 테두리를 고려한 정확한 사각형 계산
+                float halfBorder = BorderEnabled ? BorderWidth / 2.0f : 0f;
+                RectangleF drawRect = new RectangleF(halfBorder, halfBorder, w - BorderWidth, h - BorderWidth);
+
+                // 둥근 모서리 처리
+                if (CornerRadius > 0)
                 {
-                    g.FillRectangle(bgBrush, 0, 0, w, h);
+                    using var path = GetRoundedRectPathF(drawRect, CornerRadius);
+                    
+                    using (var bgBrush = new SolidBrush(currentColor))
+                    {
+                        g.FillPath(bgBrush, path);
+                    }
+
+                    if (BorderEnabled)
+                    {
+                        using var pen = new Pen(BorderColor, BorderWidth);
+                        g.DrawPath(pen, path);
+                    }
+                }
+                else
+                {
+                    using (var bgBrush = new SolidBrush(currentColor))
+                    {
+                        g.FillRectangle(bgBrush, 0, 0, w, h);
+                    }
+
+                    if (BorderEnabled)
+                    {
+                        using var pen = new Pen(BorderColor, BorderWidth);
+                        g.DrawRectangle(pen, halfBorder, halfBorder, w - BorderWidth, h - BorderWidth);
+                    }
                 }
 
-                // 🆕 DisplayName이 있으면 사용, 없으면 기본 키 이름
+                // 텍스트 그리기
                 string keyText = !string.IsNullOrEmpty(DisplayName) 
                     ? DisplayName 
                     : GetKeyDisplayName(Key);
                 
-                var rect = new Rectangle(0, 0, w, h);
-                using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                using var sf = new StringFormat 
+                { 
+                    Alignment = StringAlignment.Center, 
+                    LineAlignment = StringAlignment.Center,
+                    FormatFlags = StringFormatFlags.NoWrap
+                };
                 
-                // OBS 모드와 동일한 폰트 크기 계산
                 int fontSize = Math.Max(8, Math.Min(w, h) / 3);
-                using var font = new Font("Arial", fontSize, FontStyle.Bold);
-                
-                // 대비 색 (불투명)
+                using var font = new Font("Arial", fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
                 Color textColor = GetContrastColor(Color.FromArgb(255, currentColor));
                 using var brush = new SolidBrush(textColor);
-                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-                g.DrawString(keyText, font, brush, rect, sf);
+                
+                g.DrawString(keyText, font, brush, new RectangleF(0, 0, w, h), sf);
             }
 
             UpdateLayeredWindowFromBitmap(bmp);
+        }
+
+        // 🆕 RectangleF 버전의 둥근 사각형 경로 (더 정밀함)
+        private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPathF(RectangleF bounds, float radius)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+
+            if (radius <= 0)
+            {
+                path.AddRectangle(bounds);
+                return path;
+            }
+
+            float diameter = radius * 2f;
+            
+            // 반경이 너무 크면 제한
+            float maxRadius = Math.Min(bounds.Width, bounds.Height) / 2f;
+            if (radius > maxRadius)
+            {
+                radius = maxRadius;
+                diameter = radius * 2f;
+            }
+
+            var arc = new RectangleF(bounds.X, bounds.Y, diameter, diameter);
+            
+            // 왼쪽 위
+            path.AddArc(arc, 180, 90);
+            
+            // 오른쪽 위
+            arc.X = bounds.Right - diameter;
+            path.AddArc(arc, 270, 90);
+            
+            // 오른쪽 아래
+            arc.Y = bounds.Bottom - diameter;
+            path.AddArc(arc, 0, 90);
+            
+            // 왼쪽 아래
+            arc.X = bounds.Left;
+            path.AddArc(arc, 90, 90);
+            
+            path.CloseFigure();
+
+            return path;
         }
 
         private void UpdateLayeredWindowFromBitmap(Bitmap bmp)

@@ -265,5 +265,80 @@ namespace keyviewer
                     _txtDisplayName.Text = value ?? "";
             }
         }
+
+        private void BtnBorderColor_Click(object? sender, EventArgs e)
+        {
+            if (_colorDialog == null || _previewBorder == null) return;
+            _colorDialog.Color = _previewBorder.BackColor;
+            if (_colorDialog.ShowDialog(this) == DialogResult.OK)
+                _previewBorder.BackColor = _colorDialog.Color;
+        }
+
+        private void ChkBorder_CheckedChanged(object? sender, EventArgs e)
+        {
+            // 체크 상태 변경
+        }
+
+        // 속성 추가
+        [Browsable(true)]
+        [Category("Appearance")]
+        [Description("Enable border for the panel.")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        [DefaultValue(false)]
+        public bool BorderEnabled
+        {
+            get => _chkBorder?.Checked ?? false;
+            set
+            {
+                if (_chkBorder != null)
+                    _chkBorder.Checked = value;
+            }
+        }
+
+        [Browsable(true)]
+        [Category("Appearance")]
+        [Description("Border color.")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        [TypeConverter(typeof(System.Drawing.ColorConverter))]
+        [DefaultValue(typeof(Color), "Black")]
+        public Color BorderColor
+        {
+            get => _previewBorder?.BackColor ?? Color.Black;
+            set
+            {
+                if (_previewBorder != null)
+                    _previewBorder.BackColor = value;
+            }
+        }
+
+        [Browsable(true)]
+        [Category("Appearance")]
+        [Description("Border width in pixels (1-10).")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        [DefaultValue(2)]
+        public int BorderWidth
+        {
+            get => _numBorderWidth?.Value != null ? (int)_numBorderWidth.Value : 2;
+            set
+            {
+                if (_numBorderWidth != null)
+                    _numBorderWidth.Value = Math.Clamp(value, (int)_numBorderWidth.Minimum, (int)_numBorderWidth.Maximum);
+            }
+        }
+
+        [Browsable(true)]
+        [Category("Appearance")]
+        [Description("Corner radius in pixels (0-50). 0 = square corners.")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        [DefaultValue(0)]
+        public int CornerRadius
+        {
+            get => _numCornerRadius?.Value != null ? (int)_numCornerRadius.Value : 0;
+            set
+            {
+                if (_numCornerRadius != null)
+                    _numCornerRadius.Value = Math.Clamp(value, (int)_numCornerRadius.Minimum, (int)_numCornerRadius.Maximum);
+            }
+        }
     }
 }

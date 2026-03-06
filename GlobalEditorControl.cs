@@ -67,6 +67,19 @@ namespace keyviewer
             // 체크박스 상태가 변경될 때 아무것도 안 함 (Form1에서 읽기만 함)
         }
 
+        private void BtnBorderColor_Click(object? sender, EventArgs e)
+        {
+            if (_colorDialog == null || _previewBorder == null) return;
+            _colorDialog.Color = _previewBorder.BackColor;
+            if (_colorDialog.ShowDialog(this) == DialogResult.OK)
+                _previewBorder.BackColor = _colorDialog.Color;
+        }
+
+        private void ChkBorder_CheckedChanged(object? sender, EventArgs e)
+        {
+            // 체크 상태 변경 (Form1에서 읽음)
+        }
+
         // 기존 속성들 (안전한 null 처리 포함)
         private int SafeKeyAlpha => _tbKeyAlpha?.Value ?? 255;
         private Color SafePreviewUpColor => _previewUp?.BackColor ?? Color.Gray;
@@ -237,6 +250,68 @@ namespace keyviewer
                     _cboChromaKey.SelectedIndex = 3; // Black
                 else
                     _cboChromaKey.SelectedIndex = 0; // 기본값
+            }
+        }
+
+        [Browsable(true)]
+        [Category("Appearance")]
+        [Description("Enable border for all key panels.")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        [DefaultValue(false)]
+        public bool BorderEnabled
+        {
+            get => _chkBorder?.Checked ?? false;
+            set
+            {
+                if (_chkBorder != null)
+                    _chkBorder.Checked = value;
+            }
+        }
+
+        [Browsable(true)]
+        [Category("Appearance")]
+        [Description("Border color for key panels.")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        [TypeConverter(typeof(System.Drawing.ColorConverter))]
+        [DefaultValue(typeof(Color), "Black")]
+        public Color BorderColor
+        {
+            get => _previewBorder?.BackColor ?? Color.Black;
+            set
+            {
+                if (_previewBorder != null)
+                    _previewBorder.BackColor = value;
+            }
+        }
+
+        [Browsable(true)]
+        [Category("Appearance")]
+        [Description("Border width in pixels (1-10).")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        [DefaultValue(2)]
+        public int BorderWidth
+        {
+            get => _numBorderWidth?.Value != null ? (int)_numBorderWidth.Value : 2;
+            set
+            {
+                if (_numBorderWidth != null)
+                    _numBorderWidth.Value = Math.Clamp(value, (int)_numBorderWidth.Minimum, (int)_numBorderWidth.Maximum);
+            }
+        }
+
+        // 속성 추가
+        [Browsable(true)]
+        [Category("Appearance")]
+        [Description("Corner radius in pixels (0-50). 0 = square corners.")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+        [DefaultValue(0)]
+        public int CornerRadius
+        {
+            get => _numCornerRadius?.Value != null ? (int)_numCornerRadius.Value : 0;
+            set
+            {
+                if (_numCornerRadius != null)
+                    _numCornerRadius.Value = Math.Clamp(value, (int)_numCornerRadius.Minimum, (int)_numCornerRadius.Maximum);
             }
         }
     }

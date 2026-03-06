@@ -244,7 +244,11 @@ namespace keyviewer
                     Width = kp.Panel.Size.Width,
                     Height = kp.Panel.Size.Height,
                     Name = kp.Panel.Name,
-                    DisplayName = kp.DisplayName // 🆕 커스텀 이름 저장
+                    DisplayName = kp.DisplayName,
+                    BorderEnabled = kp.BorderEnabled,
+                    BorderColorArgb = kp.BorderColor.ToArgb(),
+                    BorderWidth = kp.BorderWidth,
+                    CornerRadius = kp.CornerRadius // 🆕
                 };
                 layout.Panels.Add(cfg);
             }
@@ -526,9 +530,16 @@ namespace keyviewer
                 string? currentBgPath = _currentBgImagePath;
                 int keyAlphaInit = _keyPanels.Count > 0 ? _keyPanels[0].UpColor.A : 255;
                 int opacityPercent = (int)(this.Opacity * 100);
+                
+                // 🆕 테두리 설정 초기값 가져오기
+                bool borderEnabledInit = _keyPanels.Count > 0 ? _keyPanels[0].BorderEnabled : false;
+                Color borderColorInit = _keyPanels.Count > 0 ? _keyPanels[0].BorderColor : Color.Black;
+                int borderWidthInit = _keyPanels.Count > 0 ? _keyPanels[0].BorderWidth : 2;
+                int cornerRadiusInit = _keyPanels.Count > 0 ? _keyPanels[0].CornerRadius : 0;
 
                 using var dlg = new GlobalEditorForm(upInit, downInit, bgInit, currentBgPath,
-                    keyAlphaInit, opacityPercent, _backgroundTransparent, _chromaKeyColor);
+                    keyAlphaInit, opacityPercent, _backgroundTransparent, _chromaKeyColor,
+                    borderEnabledInit, borderColorInit, borderWidthInit, cornerRadiusInit); // 🆕 테두리 파라미터 추가
 
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
@@ -540,6 +551,15 @@ namespace keyviewer
                         kp.UpColor = Color.FromArgb(finalAlpha, dlg.SelectedUpColor);
                         kp.DownColor = Color.FromArgb(finalAlpha, dlg.SelectedDownColor);
                         kp.Panel.BackColor = kp.UpColor;
+                        
+                        // 테두리 설정 적용
+                        kp.BorderEnabled = dlg.BorderEnabled;
+                        kp.BorderColor = dlg.BorderColor;
+                        kp.BorderWidth = dlg.BorderWidth;
+                        
+                        // 모서리 반경 적용
+                        kp.CornerRadius = dlg.CornerRadius;
+                        
                         kp.UpdateVisual();
                     }
 
@@ -595,10 +615,8 @@ namespace keyviewer
                         }
                     }
 
-                    // 🔥 폼 불투명도 적용 (배경 반투명)
                     this.Opacity = dlg.SelectedOpacityPercent / 100.0;
 
-                    // 반투명 설정 안내 메시지
                     if (dlg.SelectedOpacityPercent < 100 || dlg.SelectedKeyAlpha < 255)
                     {
                         if (_obsCompatibilityMode && !_backgroundTransparent)
@@ -704,13 +722,16 @@ namespace keyviewer
         {
             if (kp == null) return;
             
-            // 🆕 기존 크기도 함께 전달
             using var editor = new PanelEditorForm(
                 kp.Key, 
                 kp.UpColor, 
                 kp.DownColor, 
                 kp.DisplayName ?? "", 
-                kp.Panel.Size); // 기존 크기 전달
+                kp.Panel.Size,
+                kp.BorderEnabled,
+                kp.BorderColor,
+                kp.BorderWidth,
+                kp.CornerRadius); // 🆕 모서리 반경 전달
     
             if (editor.ShowDialog(this) == DialogResult.OK)
             {
@@ -720,7 +741,14 @@ namespace keyviewer
                 kp.DisplayName = editor.SelectedDisplayName;
                 kp.Panel.BackColor = kp.UpColor;
 
-                // 크기 변경 지원
+                // 테두리 설정
+                kp.BorderEnabled = editor.BorderEnabled;
+                kp.BorderColor = editor.BorderColor;
+                kp.BorderWidth = editor.BorderWidth;
+                
+                // 🆕 모서리 반경
+                kp.CornerRadius = editor.CornerRadius;
+
                 var newSize = editor.SelectedSize;
                 if (kp.Panel.Size != newSize)
                 {
