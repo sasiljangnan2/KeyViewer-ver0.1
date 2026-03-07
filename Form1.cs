@@ -39,6 +39,9 @@ namespace keyviewer
         private const int WM_KEYUP = 0x0101;
         private const int WM_SYSKEYDOWN = 0x0104;
         private const int WM_SYSKEYUP = 0x0105;
+        private const int WM_SYSCOMMAND = 0x0112;  // 🔥 추가
+        private const int SC_MINIMIZE = 0xF020;     // 🔥 추가
+        private const int SC_RESTORE = 0xF120;      // 🔥 추가
         private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
         // KeyPanel 서비스(팩토리 + 관리)
@@ -73,6 +76,8 @@ namespace keyviewer
         private static extern IntPtr GetModuleHandle(string lpModuleName);
 
         private bool _obsCompatibilityMode = false; // OBS 호환 모드
+        private bool _isMinimizing = false; // 🔥 최소화 중 플래그
+        private bool _alwaysOnTop = false; // 🔥 Always on Top 상태 추적
 
         public Form1()
         {
@@ -127,26 +132,9 @@ namespace keyviewer
                 {
                     SyncLayeredWindows();
                     SyncLayeredWindowsVisibility();
-
-                    foreach (var kp in _keyPanels)
-                    {
-                        if (kp.LayeredWindow != null && !kp.LayeredWindow.IsDisposed)
-                        {
-                            kp.LayeredWindow.TopMost = this.TopMost;
-                        }
-                    }
                 };
 
-                this.Activated += (s, e) =>
-                {
-                    foreach (var kp in _keyPanels)
-                    {
-                        if (kp.LayeredWindow != null && !kp.LayeredWindow.IsDisposed)
-                        {
-                            kp.LayeredWindow.BringToFront();
-                        }
-                    }
-                };
+                // 🔥 Owner 관계에 의해 Z-order 자동 관리 → Activated 핸들러 불필요
             }
         }
 
@@ -161,14 +149,9 @@ namespace keyviewer
                 {
                     foreach (var kp in _keyPanels)
                     {
-                        if (kp.LayeredWindow != null && !kp.LayeredWindow.IsDisposed)
-                        {
-                            kp.LayeredWindow.Show();
-                            kp.LayeredWindow.BringToFront();
-                            kp.UpdateVisual();
-                            System.Diagnostics.Debug.WriteLine(
-                                $"Forced show: {kp.Key} at {kp.LayeredWindow.Location}");
-                        }
+                        kp.Show();        // 🔥 _layeredWindow.Show() 대신
+                        kp.BringToFront();
+                        kp.UpdateVisual();
                     }
                 }));
             });
@@ -177,6 +160,9 @@ namespace keyviewer
         // 레이어드 윈도우 위치 동기화 (이벤트 핸들러 시그니처로 변경)
         private void SyncLayeredWindows(object? sender, EventArgs e)
         {
+            if (WindowState == FormWindowState.Minimized || _isMinimizing) return;
+            if (this.Left < -10000 || this.Top < -10000) return; // 🔥 최소화 좌표(-32000) 필터링
+    
             foreach (var kp in _keyPanels)
             {
                 var screenLoc = this.PointToScreen(kp.Panel.Location);
@@ -192,6 +178,8 @@ namespace keyviewer
 
         private void SyncLayeredWindowsVisibility(object? sender, EventArgs e)
         {
+            if (WindowState == FormWindowState.Minimized || _isMinimizing) return; // 🔥 플래그 체크 추가
+    
             foreach (var kp in _keyPanels)
             {
                 if (this.Visible)
@@ -382,14 +370,13 @@ namespace keyviewer
 
             var toggleTopMost = new ToolStripMenuItem("Always on Top");
             toggleTopMost.CheckOnClick = true;
-            toggleTopMost.Checked = this.TopMost;
+            toggleTopMost.Checked = false;
             toggleTopMost.Click += (s, e) =>
             {
-                this.TopMost = toggleTopMost.Checked;
+                _alwaysOnTop = toggleTopMost.Checked;
                 foreach (var kp in _keyPanels)
                 {
-                    if (kp.LayeredWindow != null && !kp.LayeredWindow.IsDisposed)
-                        kp.LayeredWindow.TopMost = this.TopMost;
+                    kp.SetTopMost(_alwaysOnTop);
                 }
             };
 
@@ -949,6 +936,48 @@ namespace keyviewer
             if (color.R == 0 && color.G == 0 && color.B == 255) return "Blue";
             if (color.R == 0 && color.G == 0 && color.B == 0) return "Black";
             return "Custom";
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_SYSCOMMAND && !_obsCompatibilityMode)
+            {
+                int command = m.WParam.ToInt32() & 0xFFF0;
+                
+                if (command == SC_MINIMIZE)
+                {
+                    _isMinimizing = true;
+                    
+                    if (_alwaysOnTop)
+                    {
+                        // 🔥 Always on Top: 버튼은 그대로 유지
+                        base.WndProc(ref m);
+                    }
+                    else
+                    {
+                        // 일반 모드: 버튼도 숨김
+                        foreach (var kp in _keyPanels)
+                            kp.Hide();
+                        base.WndProc(ref m);
+                    }
+                    return;
+                }
+                
+                if (command == SC_RESTORE)
+                {
+                    base.WndProc(ref m);
+                    _isMinimizing = false;
+                    foreach (var kp in _keyPanels)
+                    {
+                        kp.Show();
+                        kp.BringToFront();
+                    }
+                    SyncLayeredWindows();
+                    return;
+                }
+            }
+            
+            base.WndProc(ref m);
         }
     }
 }

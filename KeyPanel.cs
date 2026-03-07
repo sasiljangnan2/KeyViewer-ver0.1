@@ -33,13 +33,33 @@ namespace keyviewer
         private const int GWL_EXSTYLE = -20;
         private const int WS_EX_LAYERED = 0x80000;
         private const int WS_EX_TOOLWINDOW = 0x80;
+        private const int WS_EX_NOACTIVATE = 0x08000000; // 🔥 있는지 확인
         private const byte AC_SRC_OVER = 0x00;
         private const byte AC_SRC_ALPHA = 0x01;
         private const int ULW_ALPHA = 0x00000002;
         private const int WM_GETMINMAXINFO = 0x0024;
         private const int SWP_NOMOVE = 0x0002;
+        private const int SWP_NOSIZE = 0x0001;  // 🔥 추가
         private const int SWP_NOZORDER = 0x0004;
         private const int SWP_NOACTIVATE = 0x0010;
+        private const int SW_SHOWNOACTIVATE = 4; // 🔥 있는지 확인
+        private const int SW_HIDE = 0;            // 🔥 있는지 확인
+        private const int GWLP_HWNDPARENT = -8; // 🔥 Win32 owner 제어
+        
+        private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
+        private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+        [DllImport("user32.dll", EntryPoint = "SetWindowLong", SetLastError = true)]
+        private static extern IntPtr SetWindowLongPtr32(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        private static IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
+        {
+            return IntPtr.Size == 8
+                ? SetWindowLongPtr64(hWnd, nIndex, dwNewLong)
+                : SetWindowLongPtr32(hWnd, nIndex, dwNewLong);
+        }
 
         [DllImport("user32.dll")]
         private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
@@ -62,6 +82,8 @@ namespace keyviewer
         private static extern bool DeleteObject(IntPtr hObject);
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow); // 🔥 추가
 
         public Panel Panel { get; }
         private LayeredForm? _layeredWindow;
@@ -182,14 +204,15 @@ namespace keyviewer
         // 최소 크기 제약을 우회하는 커스텀 Form 클래스
         private class LayeredForm : Form
         {
+            protected override bool ShowWithoutActivation => true; // 🔥 포커스 없이 Show 가능
+
             protected override void WndProc(ref Message m)
             {
                 if (m.Msg == WM_GETMINMAXINFO)
                 {
-                    // 최소/최대 크기 제약 제거
                     MINMAXINFO mmi = (MINMAXINFO)Marshal.PtrToStructure(m.LParam, typeof(MINMAXINFO))!;
-                    mmi.ptMinTrackSize = new System.Drawing.Point(1, 1); // 최소 1x1
-                    mmi.ptMaxTrackSize = new System.Drawing.Point(10000, 10000); // 최대 크기
+                    mmi.ptMinTrackSize = new System.Drawing.Point(1, 1);
+                    mmi.ptMaxTrackSize = new System.Drawing.Point(10000, 10000);
                     Marshal.StructureToPtr(mmi, m.LParam, true);
                 }
                 base.WndProc(ref m);
@@ -200,10 +223,9 @@ namespace keyviewer
         {
             if (_layeredWindow != null && !_layeredWindow.IsDisposed) return;
 
-            // 초기 위치 계산 (화면 좌표)
             Point initialLocation = Panel.Parent != null 
                 ? Panel.Parent.PointToScreen(Panel.Location) 
-                : new Point(100, 100); // 기본 위치
+                : new Point(100, 100);
 
             _layeredWindow = new LayeredForm
             {
@@ -211,18 +233,18 @@ namespace keyviewer
                 ShowInTaskbar = false,
                 StartPosition = FormStartPosition.Manual,
                 Location = initialLocation,
-                Size = Panel.Size, // 크기 먼저 설정
+                Size = Panel.Size,
                 MinimumSize = new Size(0, 0),
                 MaximumSize = new Size(0, 0),
                 AutoSize = false,
-                Owner = Panel.Parent as Form,
-                TopMost = true // 🆕 기본적으로 최상위 표시
+                Owner = Panel.FindForm(),  // 🔥 Owner를 Form1으로 설정 → Z-order 자동 관리
+                TopMost = false
             };
 
             _layeredWindow.Load += (_, __) =>
             {
                 int ex = GetWindowLong(_layeredWindow.Handle, GWL_EXSTYLE);
-                ex |= WS_EX_LAYERED | WS_EX_TOOLWINDOW;
+                ex |= WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
                 SetWindowLong(_layeredWindow.Handle, GWL_EXSTYLE, ex);
                 
                 SetWindowPos(_layeredWindow.Handle, IntPtr.Zero, 
@@ -233,7 +255,6 @@ namespace keyviewer
 
             _layeredWindow.Show();
             
-            // Show 후 크기 재설정
             _layeredWindow.Size = Panel.Size;
             SetWindowPos(_layeredWindow.Handle, IntPtr.Zero, 
                 _layeredWindow.Left, _layeredWindow.Top, 
@@ -241,10 +262,6 @@ namespace keyviewer
                 SWP_NOZORDER | SWP_NOACTIVATE);
             
             UpdateVisual();
-            
-            // 🆕 디버깅 로그
-            System.Diagnostics.Debug.WriteLine(
-                $"LayeredWindow created: Pos={_layeredWindow.Location}, Size={_layeredWindow.Size}");
         }
 
         public void UpdatePosition(Point screenLocation)
@@ -296,7 +313,7 @@ namespace keyviewer
             }
         }
 
-        // 둥근 사각형 경로 생성 헬퍼 메서드
+        // 둥글은 사각형 경로 생성 헬퍼 메서드
         private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPath(Rectangle bounds, int radius)
         {
             int diameter = radius * 2;
@@ -351,7 +368,7 @@ namespace keyviewer
                 float halfBorder = BorderEnabled ? BorderWidth / 2.0f : 0f;
                 RectangleF drawRect = new RectangleF(halfBorder, halfBorder, w - BorderWidth, h - BorderWidth);
 
-                // 둥근 모서리 처리
+                // 둥글 모서리 처리
                 if (CornerRadius > 0)
                 {
                     using var path = GetRoundedRectPathF(drawRect, CornerRadius);
@@ -404,7 +421,7 @@ namespace keyviewer
             UpdateLayeredWindowFromBitmap(bmp);
         }
 
-        // 🆕 RectangleF 버전의 둥근 사각형 경로 (더 정밀함)
+        // 🆕 RectangleF 버전의 둥글 사각형 경로 (더 정밀함)
         private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectPathF(RectangleF bounds, float radius)
         {
             var path = new System.Drawing.Drawing2D.GraphicsPath();
@@ -500,24 +517,52 @@ namespace keyviewer
         {
             if (_obsCompatibilityMode)
                 Panel.Visible = true;
-            else
-                _layeredWindow?.Show();
+            else if (_layeredWindow != null && !_layeredWindow.IsDisposed)
+                ShowWindow(_layeredWindow.Handle, SW_SHOWNOACTIVATE); // 🔥 포커스 없이 표시
         }
 
         public void Hide()
         {
             if (_obsCompatibilityMode)
                 Panel.Visible = false;
-            else
-                _layeredWindow?.Hide();
+            else if (_layeredWindow != null && !_layeredWindow.IsDisposed)
+                ShowWindow(_layeredWindow.Handle, SW_HIDE); // 🔥 명시적 숨기기
         }
 
         public void BringToFront()
         {
             if (_obsCompatibilityMode)
                 Panel.BringToFront();
+            else if (_layeredWindow != null && !_layeredWindow.IsDisposed)
+                SetWindowPos(_layeredWindow.Handle, IntPtr.Zero,
+                    0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE); // 🔥 포커스 없이 Z-order만 변경
+        }
+
+        public void SetTopMost(bool topMost)
+        {
+            if (_layeredWindow == null || _layeredWindow.IsDisposed) return;
+
+            if (topMost)
+            {
+                // 🔥 Win32로 Owner 해제 → 독립 윈도우로 전환
+                SetWindowLongPtr(_layeredWindow.Handle, GWLP_HWNDPARENT, IntPtr.Zero);
+                // 🔥 HWND_TOPMOST로 항상 위에
+                SetWindowPos(_layeredWindow.Handle, HWND_TOPMOST,
+                    0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            }
             else
-                _layeredWindow?.BringToFront();
+            {
+                // 🔥 TOPMOST 해제
+                SetWindowPos(_layeredWindow.Handle, HWND_NOTOPMOST,
+                    0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                // 🔥 Win32로 Owner 복원
+                var ownerForm = Panel.FindForm();
+                if (ownerForm != null)
+                    SetWindowLongPtr(_layeredWindow.Handle, GWLP_HWNDPARENT, ownerForm.Handle);
+            }
         }
 
         private string GetKeyDisplayName(Keys key)
