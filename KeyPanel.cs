@@ -567,15 +567,20 @@ namespace keyviewer
 
         private string GetKeyDisplayName(Keys key)
         {
-            // 커스텀 이름이 있으면 우선 사용
             if (!string.IsNullOrWhiteSpace(DisplayName))
                 return DisplayName;
 
             return key switch
             {
-                Keys.LControlKey or Keys.RControlKey or Keys.ControlKey => "Ctrl",
-                Keys.LShiftKey or Keys.RShiftKey or Keys.ShiftKey => "Shift",
-                Keys.LMenu or Keys.RMenu or Keys.Menu => "Alt",
+                Keys.LShiftKey => "LShift",
+                Keys.RShiftKey => "RShift",
+                Keys.LControlKey => "LCtrl",
+                Keys.RControlKey => "RCtrl",
+                Keys.LMenu => "LAlt",
+                Keys.RMenu => "RAlt",
+                Keys.ShiftKey => "Shift",
+                Keys.ControlKey => "Ctrl",
+                Keys.Menu => "Alt",
                 Keys.Space => "Space",
                 _ => key.ToString().Replace("Key", "")
             };

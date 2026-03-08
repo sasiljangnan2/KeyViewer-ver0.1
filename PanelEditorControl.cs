@@ -1,97 +1,162 @@
-using System;
+ï»¿using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace keyviewer
 {
     public partial class PanelEditorControl : UserControl
     {
+        // ì €ìˆ˜ì¤€ í‚¤ë³´ë“œ í›…
+        private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
+        private LowLevelKeyboardProc? _hookProc;
+        private IntPtr _hookID = IntPtr.Zero;
 
-        private bool _isRecording = false; // ³ìÈ­ »óÅÂ ÇÃ·¡±×
-        private Keys _lastRecordedKey = Keys.None; // ¸¶Áö¸·À¸·Î ÀÔ·ÂµÈ Å°¸¦ ³ìÈ­ÇÏ±â À§ÇÑ º¯¼ö
+        private const int WH_KEYBOARD_LL = 13;
+        private const int WM_KEYDOWN = 0x0100;
 
-        private void BtnRecord_Click(object sender, EventArgs e) // ´ÜÃàÅ°¼³Á¤ ³ìÈ­½ÃÀÛ
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+        [DllImport("user32.dll")]
+        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        private bool _isRecording = false;
+        private Keys _lastRecordedKey = Keys.None;
+
+        public bool IsRecording => _isRecording;
+
+        public void RecordKey(Keys rawKey)
         {
-            if (!_isRecording) // ³ìÈ­°¡ ½ÃÀÛµÊ
-            {
+            _lastRecordedKey = rawKey;
+            _cbKeys.Text = GetRawKeyDisplayName(rawKey);
+            _lblCurrentKeyInfo.Text = $"ìž…ë ¥ëœ í‚¤: {GetRawKeyDisplayName(rawKey)}";
+        }
 
+        private void StartHook()
+        {
+            if (_hookID != IntPtr.Zero) return;
+            _hookProc = HookCallback;
+            using var proc = Process.GetCurrentProcess();
+            using var module = proc.MainModule!;
+            _hookID = SetWindowsHookEx(WH_KEYBOARD_LL, _hookProc,
+                GetModuleHandle(module.ModuleName!), 0);
+        }
+
+        private void StopHook()
+        {
+            if (_hookID == IntPtr.Zero) return;
+            UnhookWindowsHookEx(_hookID);
+            _hookID = IntPtr.Zero;
+            _hookProc = null;
+        }
+
+        private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN && _isRecording)
+            {
+                int vkCode = Marshal.ReadInt32(lParam);
+                Keys rawKey = (Keys)vkCode;
+
+                // UI ìŠ¤ë ˆë“œì—ì„œ ì—…ë°ì´íŠ¸
+                if (this.IsHandleCreated)
+                {
+                    this.BeginInvoke(new Action(() => RecordKey(rawKey)));
+                }
+            }
+            return CallNextHookEx(_hookID, nCode, wParam, lParam);
+        }
+
+        private void BtnRecord_Click(object sender, EventArgs e)
+        {
+            if (!_isRecording)
+            {
                 _isRecording = true;
-                _btnRecord.Text = "¼³Á¤ ÁßÁöÇÏ±â";
+                _btnRecord.Text = "ì„¤ì • ì¤‘ì§€í•˜ê¸°";
                 _btnRecord.BackColor = Color.Red;
                 _btnRecord.ForeColor = Color.White;
-
                 _cbKeys.BackColor = Color.LemonChiffon;
-                _lblCurrentKeyInfo.Text = "Å°º¸µå Å°¸¦ ´©¸£¼¼¿ä...";
-
-                // Æ÷Ä¿½º¸¦ ÀÌ ÄÁÆ®·Ñ·Î °¡Á®¿Í¾ß Å° ÀÔ·ÂÀ» Á÷Á¢ ¹ÞÀ½
-                this.Focus();
+                _lblCurrentKeyInfo.Text = "í‚¤ë³´ë“œ í‚¤ë¥¼ ëˆ„ë¥´ì„¸ìš”...";
+                StartHook(); // ðŸ”¥ ì €ìˆ˜ì¤€ í›… ì„¤ì¹˜
             }
-            else // ³ìÈ­°¡ ÁßÁöµÊ
-             {
+            else
+            {
+                StopHook(); // ðŸ”¥ í›… ì œê±°
                 StopRecording();
             }
         }
-        //´ÜÃàÅ° ³ìÈ­ ÁßÁö
+
         private void StopRecording()
         {
             _isRecording = false;
-            _btnRecord.Text = "´ÜÃàÅ° ¼³Á¤";
+            _btnRecord.Text = "ë‹¨ì¶•í‚¤ ì„¤ì •";
             _btnRecord.BackColor = SystemColors.Control;
             _btnRecord.ForeColor = SystemColors.ControlText;
             _cbKeys.BackColor = SystemColors.Control;
 
-            //ÄÞº¸¹Ú½º ¸·ÇûÀ» °æ¿ì ´Ù½Ã È°¼ºÈ­
             if (_cbKeys != null) _cbKeys.Enabled = false;
-            
+
             if (_lastRecordedKey != Keys.None)
             {
                 this.SelectedKey = _lastRecordedKey;
-                _lblCurrentKeyInfo.Text = $"¼³Á¤µÊ: {_lastRecordedKey}";
+                _lblCurrentKeyInfo.Text = $"ì„¤ì •ë¨: {GetRawKeyDisplayName(_lastRecordedKey)}";
             }
         }
 
-        private void BtnStop_Click(object sender, EventArgs e) // ³ìÈ­ ½ÃÀÛ ½Ã ÀÛµ¿ÇÏ¸ç ³ìÈ­¸¦ ÁßÁöÇÏ´Â ¹öÆ° Å¬¸¯ ÇÚµé·¯
+        private void BtnStop_Click(object sender, EventArgs e)
         {
+            StopHook();
             _isRecording = false;
-            _btnRecord.Text = "´ÜÃàÅ° ¼³Á¤";
+            _btnRecord.Text = "ë‹¨ì¶•í‚¤ ì„¤ì •";
             _cbKeys.BackColor = SystemColors.Window;
             _btnRecord.BackColor = SystemColors.Control;
             _btnRecord.ForeColor = SystemColors.ControlText;
 
             if (_cbKeys != null) _cbKeys.Enabled = true;
-            // ³ìÈ­µÈ ¸¶Áö¸· Å°¸¦ ComboBox¿¡ ¹Ý¿µ
             if (_lastRecordedKey != Keys.None)
-            {
                 this.SelectedKey = _lastRecordedKey;
-            }
         }
 
-        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
-        {
-            if (_isRecording)
-            {
-                // °¡Àå ¸¶Áö¸·À¸·Î ´©¸¥ Å°¸¸ ÀúÀå(±× ¾Õ¿¡ ´©¸¥ Å°µéÀº Á¦¿Ü)
-                _lastRecordedKey = keyData;
-                _cbKeys.Text = keyData.ToString();
-                _lblCurrentKeyInfo.Text = $"ÀÔ·ÂµÈ Å°: {keyData}"; // Å° ÀÌ¸§À» ¶ç¿ò
-
-                return true; // ÀÌ Å° ÀÔ·ÂÀ» ½Ã½ºÅÛ¿¡ ³Ñ±âÁö ¾Ê°í ¿©±â¼­ ¼Ò¸ðÇÔ
-            }
-            return base.ProcessCmdKey(ref msg, keyData);
-        }
-
-        protected override void OnMouseDown(MouseEventArgs e) // ¸¶¿ì½º ¹öÆ°À» ÀÔ·ÂÇÒ ¶§ ³ìÈ­±â´É ÀÛµ¿
+        // ProcessCmdKeyëŠ” í›…ìœ¼ë¡œ ëŒ€ì²´ë˜ì—ˆìœ¼ë¯€ë¡œ ì œê±°
+        protected override void OnMouseDown(MouseEventArgs e)
         {
             if (_isRecording)
             {
                 if (e.Button == MouseButtons.Left) _lastRecordedKey = Keys.LButton;
                 else if (e.Button == MouseButtons.Right) _lastRecordedKey = Keys.RButton;
 
-                _lblCurrentKeyInfo.Text = $"ÀÔ·ÂµÈ Å°: {_lastRecordedKey}";
-                _cbKeys.Text = _lastRecordedKey.ToString(); // È­¸é¿¡ Áï½Ã Ç¥½Ã
+                _lblCurrentKeyInfo.Text = $"ìž…ë ¥ëœ í‚¤: {GetRawKeyDisplayName(_lastRecordedKey)}";
+                _cbKeys.Text = GetRawKeyDisplayName(_lastRecordedKey);
             }
             base.OnMouseDown(e);
+        }
+
+        // ì»¨íŠ¸ë¡¤ dispose ì‹œ í›… í•´ì œ
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) StopHook();
+            base.Dispose(disposing);
+        }
+
+        private static string GetRawKeyDisplayName(Keys key)
+        {
+            return key switch
+            {
+                Keys.LShiftKey   => "Left Shift",
+                Keys.RShiftKey   => "Right Shift",
+                Keys.LControlKey => "Left Ctrl",
+                Keys.RControlKey => "Right Ctrl",
+                Keys.LMenu       => "Left Alt",
+                Keys.RMenu       => "Right Alt",
+                Keys.LButton     => "Mouse Left",
+                Keys.RButton     => "Mouse Right",
+                _                => key.ToString()
+            };
         }
 
         public PanelEditorControl()
@@ -99,7 +164,6 @@ namespace keyviewer
             InitializeComponent();
         }
 
-        // µðÀÚÀÌ³Ê ¾ÈÀü ÀÌº¥Æ® ÇÚµé·¯
         private void BtnUpColor_Click(object? sender, EventArgs e)
         {
             if (_colorDialog == null || _previewUp == null) return;
@@ -126,144 +190,93 @@ namespace keyviewer
         {
             bool inDesigner = DesignMode || (LicenseManager.UsageMode == LicenseUsageMode.Designtime);
             if (inDesigner) return;
-
             if (_cbKeys == null) return;
-
-
         }
 
-        // ¾ÈÀüÇÑ Á¢±Ù ÇïÆÛ
         private int SafeAlpha => _tbAlpha?.Value ?? 255;
         private Color SafePreviewUp => _previewUp?.BackColor ?? Color.Gray;
         private Color SafePreviewDown => _previewDown?.BackColor ?? Color.Red;
 
-        // °ø°³ ¼Ó¼º
-        [Browsable(true)]
-        [Category("Behavior")]
-        [Description("Selected key for the panel.")]
+        [Browsable(true), Category("Behavior"), DefaultValue(Keys.None)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-        [DefaultValue(Keys.None)]
         public Keys SelectedKey
         {
             get => _lastRecordedKey;
             set
             {
                 if (_cbKeys == null) return;
-
-                _lastRecordedKey = value; // ³ìÈ­ º¯¼ö¿¡ °ª ÀúÀå
-                _cbKeys.Text = value.ToString(); // ÄÞº¸¹Ú½º È­¸é¿¡ ±ÛÀÚ·Î¸¸ Ç¥½Ã
+                _lastRecordedKey = value;
+                _cbKeys.Text = GetRawKeyDisplayName(value);
             }
         }
 
-        [Browsable(true)]
-        [Category("Appearance")]
-        [Description("Panel Up color (RGB). Alpha is controlled by SelectedAlpha).")]
+        [Browsable(true), Category("Appearance"), DefaultValue(typeof(Color), "Gray")]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         [TypeConverter(typeof(ColorConverter))]
-        [DefaultValue(typeof(Color), "Gray")]
         public Color SelectedUpColor
         {
             get => Color.FromArgb(SafeAlpha, SafePreviewUp);
             set
             {
                 if (value == Color.Empty) return;
-                if (_previewUp != null)
-                    _previewUp.BackColor = Color.FromArgb(255, value.R, value.G, value.B);
-                if (_tbAlpha != null)
-                    _tbAlpha.Value = Math.Clamp(value.A, _tbAlpha.Minimum, _tbAlpha.Maximum);
-                if (_lblAlpha != null)
-                    _lblAlpha.Text = $"Alpha: {_tbAlpha?.Value ?? value.A}";
+                if (_previewUp != null) _previewUp.BackColor = Color.FromArgb(255, value.R, value.G, value.B);
+                if (_tbAlpha != null) _tbAlpha.Value = Math.Clamp(value.A, _tbAlpha.Minimum, _tbAlpha.Maximum);
+                if (_lblAlpha != null) _lblAlpha.Text = $"Alpha: {_tbAlpha?.Value ?? value.A}";
             }
         }
 
-        [Browsable(true)]
-        [Category("Appearance")]
-        [Description("Panel Down color (RGB). Alpha is controlled by SelectedAlpha).")]
+        [Browsable(true), Category("Appearance"), DefaultValue(typeof(Color), "Red")]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         [TypeConverter(typeof(ColorConverter))]
-        [DefaultValue(typeof(Color), "Red")]
         public Color SelectedDownColor
         {
             get => Color.FromArgb(SafeAlpha, SafePreviewDown);
             set
             {
                 if (value == Color.Empty) return;
-                if (_previewDown != null)
-                    _previewDown.BackColor = Color.FromArgb(255, value.R, value.G, value.B);
-                if (_tbAlpha != null)
-                    _tbAlpha.Value = Math.Clamp(value.A, _tbAlpha.Minimum, _tbAlpha.Maximum);
-                if (_lblAlpha != null)
-                    _lblAlpha.Text = $"Alpha: {_tbAlpha?.Value ?? value.A}";
+                if (_previewDown != null) _previewDown.BackColor = Color.FromArgb(255, value.R, value.G, value.B);
+                if (_tbAlpha != null) _tbAlpha.Value = Math.Clamp(value.A, _tbAlpha.Minimum, _tbAlpha.Maximum);
+                if (_lblAlpha != null) _lblAlpha.Text = $"Alpha: {_tbAlpha?.Value ?? value.A}";
             }
         }
 
-        [Browsable(true)]
-        [Category("Appearance")]
-        [Description("Alpha value for the key colors (0-255).")]
+        [Browsable(true), Category("Appearance"), DefaultValue(255)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-        [DefaultValue(255)]
         public int SelectedAlpha
         {
             get => _tbAlpha?.Value ?? 255;
             set
             {
-                if (_tbAlpha != null)
-                    _tbAlpha.Value = Math.Clamp(value, _tbAlpha.Minimum, _tbAlpha.Maximum);
-                if (_lblAlpha != null)
-                    _lblAlpha.Text = $"Alpha: {_tbAlpha?.Value ?? value}";
+                if (_tbAlpha != null) _tbAlpha.Value = Math.Clamp(value, _tbAlpha.Minimum, _tbAlpha.Maximum);
+                if (_lblAlpha != null) _lblAlpha.Text = $"Alpha: {_tbAlpha?.Value ?? value}";
             }
         }
 
-        // »õ·Î Ãß°¡: ÆÐ³Î ³Êºñ
-        [Browsable(true)]
-        [Category("Layout")]
-        [Description("Panel width in pixels.")]
+        [Browsable(true), Category("Layout"), DefaultValue(85)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-        [DefaultValue(85)]
         public int SelectedWidth
         {
             get => _numWidth?.Value != null ? (int)_numWidth.Value : 85;
-            set
-            {
-                if (_numWidth != null)
-                    _numWidth.Value = Math.Clamp(value, (int)_numWidth.Minimum, (int)_numWidth.Maximum);
-            }
+            set { if (_numWidth != null) _numWidth.Value = Math.Clamp(value, (int)_numWidth.Minimum, (int)_numWidth.Maximum); }
         }
 
-        // »õ·Î Ãß°¡: ÆÐ³Î ³ôÀÌ
-        [Browsable(true)]
-        [Category("Layout")]
-        [Description("Panel height in pixels.")]
+        [Browsable(true), Category("Layout"), DefaultValue(85)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-        [DefaultValue(85)]
         public int SelectedHeight
         {
             get => _numHeight?.Value != null ? (int)_numHeight.Value : 85;
-            set
-            {
-                if (_numHeight != null)
-                    _numHeight.Value = Math.Clamp(value, (int)_numHeight.Minimum, (int)_numHeight.Maximum);
-            }
+            set { if (_numHeight != null) _numHeight.Value = Math.Clamp(value, (int)_numHeight.Minimum, (int)_numHeight.Maximum); }
         }
 
-        // Å©±â¸¦ Size Å¸ÀÔÀ¸·Î ¹ÝÈ¯
         [Browsable(false)]
         public Size SelectedSize => new Size(SelectedWidth, SelectedHeight);
 
-        // Ä¿½ºÅÒ ÀÌ¸§ ÇÊµå
-        [Browsable(true)]
-        [Category("Behavior")]
-        [Description("Custom display name for the key panel. Leave empty to use default key name.")]
+        [Browsable(true), Category("Behavior"), DefaultValue("")]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-        [DefaultValue("")]
         public string SelectedDisplayName
         {
             get => _txtDisplayName?.Text ?? "";
-            set
-            {
-                if (_txtDisplayName != null)
-                    _txtDisplayName.Text = value ?? "";
-            }
+            set { if (_txtDisplayName != null) _txtDisplayName.Text = value ?? ""; }
         }
 
         private void BtnBorderColor_Click(object? sender, EventArgs e)
@@ -274,71 +287,39 @@ namespace keyviewer
                 _previewBorder.BackColor = _colorDialog.Color;
         }
 
-        private void ChkBorder_CheckedChanged(object? sender, EventArgs e)
-        {
-            // Ã¼Å© »óÅÂ º¯°æ
-        }
+        private void ChkBorder_CheckedChanged(object? sender, EventArgs e) { }
 
-        // ¼Ó¼º Ãß°¡
-        [Browsable(true)]
-        [Category("Appearance")]
-        [Description("Enable border for the panel.")]
+        [Browsable(true), Category("Appearance"), DefaultValue(false)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-        [DefaultValue(false)]
         public bool BorderEnabled
         {
             get => _chkBorder?.Checked ?? false;
-            set
-            {
-                if (_chkBorder != null)
-                    _chkBorder.Checked = value;
-            }
+            set { if (_chkBorder != null) _chkBorder.Checked = value; }
         }
 
-        [Browsable(true)]
-        [Category("Appearance")]
-        [Description("Border color.")]
+        [Browsable(true), Category("Appearance"), DefaultValue(typeof(Color), "Black")]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
         [TypeConverter(typeof(System.Drawing.ColorConverter))]
-        [DefaultValue(typeof(Color), "Black")]
         public Color BorderColor
         {
             get => _previewBorder?.BackColor ?? Color.Black;
-            set
-            {
-                if (_previewBorder != null)
-                    _previewBorder.BackColor = value;
-            }
+            set { if (_previewBorder != null) _previewBorder.BackColor = value; }
         }
 
-        [Browsable(true)]
-        [Category("Appearance")]
-        [Description("Border width in pixels (1-10).")]
+        [Browsable(true), Category("Appearance"), DefaultValue(2)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-        [DefaultValue(2)]
         public int BorderWidth
         {
             get => _numBorderWidth?.Value != null ? (int)_numBorderWidth.Value : 2;
-            set
-            {
-                if (_numBorderWidth != null)
-                    _numBorderWidth.Value = Math.Clamp(value, (int)_numBorderWidth.Minimum, (int)_numBorderWidth.Maximum);
-            }
+            set { if (_numBorderWidth != null) _numBorderWidth.Value = Math.Clamp(value, (int)_numBorderWidth.Minimum, (int)_numBorderWidth.Maximum); }
         }
 
-        [Browsable(true)]
-        [Category("Appearance")]
-        [Description("Corner radius in pixels (0-50). 0 = square corners.")]
+        [Browsable(true), Category("Appearance"), DefaultValue(0)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
-        [DefaultValue(0)]
         public int CornerRadius
         {
             get => _numCornerRadius?.Value != null ? (int)_numCornerRadius.Value : 0;
-            set
-            {
-                if (_numCornerRadius != null)
-                    _numCornerRadius.Value = Math.Clamp(value, (int)_numCornerRadius.Minimum, (int)_numCornerRadius.Maximum);
-            }
+            set { if (_numCornerRadius != null) _numCornerRadius.Value = Math.Clamp(value, (int)_numCornerRadius.Minimum, (int)_numCornerRadius.Maximum); }
         }
     }
 }

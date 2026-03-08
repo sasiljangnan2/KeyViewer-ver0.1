@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace keyviewer
@@ -10,6 +11,10 @@ namespace keyviewer
         private readonly Button _btnOk;
         private readonly Button _btnCancel;
 
+        // 🔥 좌/우 modifier 구분을 위한 GetKeyState
+        [DllImport("user32.dll")]
+        private static extern short GetKeyState(int nVirtKey);
+
         public Keys SelectedKey => _editor.SelectedKey;
         public Color SelectedUpColor => _editor.SelectedUpColor;
         public Color SelectedDownColor => _editor.SelectedDownColor;
@@ -19,7 +24,7 @@ namespace keyviewer
         public bool BorderEnabled => _editor.BorderEnabled;
         public Color BorderColor => _editor.BorderColor;
         public int BorderWidth => _editor.BorderWidth;
-        public int CornerRadius => _editor.CornerRadius; // 🆕
+        public int CornerRadius => _editor.CornerRadius;
 
         public PanelEditorForm()
         {
@@ -58,10 +63,27 @@ namespace keyviewer
             StartPosition = FormStartPosition.CenterParent;
             Text = "Panel Settings";
 
-            this.FormClosing += (s, e) =>
+            // 🔥 ProcessCmdKey 대신 KeyDown 사용 → Shift 포함 모든 키 캡처
+            this.KeyDown += OnFormKeyDown;
+        }
+
+        // 🔥 Shift/Ctrl/Alt를 포함한 모든 키를 KeyPreview로 캡처
+        private void OnFormKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (_editor?.IsRecording != true) return;
+
+            // GetKeyState로 좌/우 modifier 구분 (0xA0=LShift, 0xA1=RShift 등)
+            Keys rawKey = e.KeyCode switch
             {
-                // 대화 플래그가 있는 컨트롤의 상태를 저장
+                Keys.ShiftKey   => (GetKeyState(0xA0) & 0x8000) != 0 ? Keys.LShiftKey  : Keys.RShiftKey,
+                Keys.ControlKey => (GetKeyState(0xA2) & 0x8000) != 0 ? Keys.LControlKey : Keys.RControlKey,
+                Keys.Menu       => (GetKeyState(0xA4) & 0x8000) != 0 ? Keys.LMenu       : Keys.RMenu,
+                _               => e.KeyCode
             };
+
+            _editor.RecordKey(rawKey);
+            e.Handled = true;
+            e.SuppressKeyPress = true;
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
@@ -77,7 +99,6 @@ namespace keyviewer
             _editor.SelectedAlpha = upColor.A;
         }
 
-        // 🆕 크기를 포함한 생성자 오버로드
         public PanelEditorForm(Keys initialKey, Color upColor, Color downColor, string displayName, Size size) : this()
         {
             _editor.SelectedKey = initialKey;
@@ -85,13 +106,10 @@ namespace keyviewer
             _editor.SelectedDownColor = downColor;
             _editor.SelectedAlpha = upColor.A;
             _editor.SelectedDisplayName = displayName;
-            
-            // ✅ SelectedSize 대신 Width와 Height 개별 설정
             _editor.SelectedWidth = size.Width;
             _editor.SelectedHeight = size.Height;
         }
 
-        // 🆕 테두리 포함 생성자
         public PanelEditorForm(Keys initialKey, Color upColor, Color downColor, string displayName, Size size, 
             bool borderEnabled, Color borderColor, int borderWidth) : this()
         {
@@ -107,7 +125,6 @@ namespace keyviewer
             _editor.BorderWidth = borderWidth;
         }
 
-        // 🆕 코너 반경 포함 생성자
         public PanelEditorForm(Keys initialKey, Color upColor, Color downColor, string displayName, Size size, 
             bool borderEnabled, Color borderColor, int borderWidth, int cornerRadius) : this()
         {
@@ -121,7 +138,7 @@ namespace keyviewer
             _editor.BorderEnabled = borderEnabled;
             _editor.BorderColor = borderColor;
             _editor.BorderWidth = borderWidth;
-            _editor.CornerRadius = cornerRadius; // 🆕
+            _editor.CornerRadius = cornerRadius;
         }
 
         private void InitializeComponent()
@@ -133,9 +150,6 @@ namespace keyviewer
             ResumeLayout(false);
         }
 
-        private void PanelEditorForm_Load(object sender, EventArgs e)
-        {
-
-        }
+        private void PanelEditorForm_Load(object sender, EventArgs e) { }
     }
 }

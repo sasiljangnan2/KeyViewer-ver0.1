@@ -610,12 +610,11 @@ namespace keyviewer
             {
                 Color upInit = _keyPanels.Count > 0 ? _keyPanels[0].UpColor : _defaultColor;
                 Color downInit = _keyPanels.Count > 0 ? _keyPanels[0].DownColor : Color.Red;
-                Color bgInit = this.BackColor;
+                Color bgInit = _currentBgColor;  // 🔥 this.BackColor 대신 _currentBgColor 사용!
                 string? currentBgPath = _currentBgImagePath;
                 int keyAlphaInit = _keyPanels.Count > 0 ? _keyPanels[0].UpColor.A : 255;
                 int opacityPercent = (int)(this.Opacity * 100);
                 
-                // 🆕 테두리 설정 초기값 가져오기
                 bool borderEnabledInit = _keyPanels.Count > 0 ? _keyPanels[0].BorderEnabled : false;
                 Color borderColorInit = _keyPanels.Count > 0 ? _keyPanels[0].BorderColor : Color.Black;
                 int borderWidthInit = _keyPanels.Count > 0 ? _keyPanels[0].BorderWidth : 2;
@@ -623,7 +622,7 @@ namespace keyviewer
 
                 using var dlg = new GlobalEditorForm(upInit, downInit, bgInit, currentBgPath,
                     keyAlphaInit, opacityPercent, _backgroundTransparent, _chromaKeyColor,
-                    borderEnabledInit, borderColorInit, borderWidthInit, cornerRadiusInit); // 🆕 테두리 파라미터 추가
+                    borderEnabledInit, borderColorInit, borderWidthInit, cornerRadiusInit);
 
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
@@ -636,24 +635,25 @@ namespace keyviewer
                         kp.DownColor = Color.FromArgb(finalAlpha, dlg.SelectedDownColor);
                         kp.Panel.BackColor = kp.UpColor;
                         
-                        // 테두리 설정 적용
                         kp.BorderEnabled = dlg.BorderEnabled;
                         kp.BorderColor = dlg.BorderColor;
                         kp.BorderWidth = dlg.BorderWidth;
-                        
-                        // 모서리 반경 적용
                         kp.CornerRadius = dlg.CornerRadius;
                         
                         kp.UpdateVisual();
                     }
 
                     this.BackColor = dlg.SelectedBgColor;
-                    _currentBgColor = dlg.SelectedBgColor;
+                    _currentBgColor = dlg.SelectedBgColor;  // 🔥 항상 현재 색상 저장
                     _currentBgImagePath = dlg.SelectedBgImagePath;
+                    
+                    // 🔥 투명화 상태 이전값 저장 (토글 전)
+                    bool wasPreviouslyTransparent = _backgroundTransparent;
                     _backgroundTransparent = dlg.BackgroundTransparent;
 
                     if (_backgroundTransparent)
                     {
+                        // 투명화 활성화
                         this.BackgroundImage?.Dispose();
                         this.BackgroundImage = null;
                         this.BackColor = _chromaKeyColor;
@@ -676,8 +676,9 @@ namespace keyviewer
                     }
                     else
                     {
+                        // 🔥 투명화 해제 → 이전 배경 복원
                         this.TransparencyKey = Color.Empty;
-                        this.BackColor = _currentBgColor;
+                        this.BackColor = _currentBgColor;  // 저장된 색상 복원
 
                         try
                         {
