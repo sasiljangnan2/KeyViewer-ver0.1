@@ -37,10 +37,9 @@
             ClientSize = new Size(670, 173);
             KeyPreview = true;
             Name = "Form1";
-            Text = "dasd";
-           // Load += Form1_Load;
-          //  KeyDown += Form1_KeyDown;
-           // KeyUp += Form1_KeyUp;
+            Text = "KeyViewer";  // 🔥 창 이름 변경
+ 
+            
             ResumeLayout(false);
         }
 

@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+	 <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
+	 
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,6 +20,13 @@
 
   <ItemGroup>
     <Folder Include=".github\Models\" />
+    <Folder Include="Resources\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Resources\icon.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
