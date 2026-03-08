@@ -4,7 +4,7 @@ using System.Drawing;
 using System.Text.Json.Serialization;
 using System.Windows.Forms;
 
-namespace keyviewer
+namespace keyviewer.Models
 {
     public class KeyPanelConfig
     {

@@ -1,4 +1,4 @@
-﻿namespace keyviewer
+﻿namespace keyviewer.UI.Forms
 {
     partial class Form1
     {

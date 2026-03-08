@@ -1,10 +1,12 @@
-﻿using System;
+﻿using keyviewer.UI.Controls;
+using keyviewer.Models;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Text.Json;
 
-namespace keyviewer
+namespace keyviewer.Services
 {
     public static class LayoutManager
     {

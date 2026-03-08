@@ -16,4 +16,8 @@
     <PackageReference Include="MetroModernUI" Version="1.4.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include=".github\Models\" />
+  </ItemGroup>
+
 </Project>

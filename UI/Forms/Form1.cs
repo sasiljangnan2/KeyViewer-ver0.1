@@ -6,8 +6,12 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using System.IO;
+using keyviewer.UI.Controls;
+using keyviewer.UI.Editors;      // 🔥 추가 (PanelEditorForm, GlobalEditorForm, LayoutPickerForm)
+using keyviewer.Services;
+using keyviewer.Models;
 
-namespace keyviewer
+namespace keyviewer.UI.Forms
 {
     public partial class Form1 : Form
     {
@@ -104,16 +108,16 @@ namespace keyviewer
             // 🆕 이벤트 핸들러를 메서드로 분리하여 관리
             SetupEventHandlers();
 
-            if (_keyPanels.Count == 0)
+            if (_keyPanels.Count == 0)  // 패널이 없으면
             {
-                var testKey = _panelService.AddKeyPanel(
-                    Keys.Space,
-                    Color.Red,
-                    Color.Gray,
-                    new Point(10, 10),
-                    new Size(85, 85)
-                );
-                testKey.UpdateVisual();
+                var defaultLayout = LayoutManager.CreateSampleLayout("Default");
+                var created = LayoutManager.ApplyLayout(defaultLayout, _panelService);
+                
+                foreach (var kp in created)
+                {
+                    kp.UpdateVisual();
+                    kp.Show();
+                }
             }
 
             this.Shown += OnFormShown;
