@@ -159,7 +159,7 @@ namespace keyviewer.UI.Forms
             {
                 string iconPath = Path.Combine(
                     AppDomain.CurrentDomain.BaseDirectory,
-                    "Resources", "icon.ico"
+                    "Resources", "icon_dot.ico"
                 );
                 
                 if (File.Exists(iconPath))

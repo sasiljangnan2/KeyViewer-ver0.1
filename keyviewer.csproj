@@ -7,6 +7,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
 	 <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
+	 <ApplicationIcon>Resources\icon_dot.ico</ApplicationIcon>
 	 
   </PropertyGroup>
 
@@ -25,6 +26,9 @@
 
   <ItemGroup>
     <None Update="Resources\icon.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+	  <None Update="Resources\icon_dot.ico">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
