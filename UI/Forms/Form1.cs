@@ -142,6 +142,9 @@ namespace keyviewer.UI.Forms
         /// <summary>항상 위에 유지 모드</summary>
         private bool _alwaysOnTop = false;
 
+        /// <summary>바 모드 윈도우</summary>
+        private BarModeForm? _barModeForm = null;
+
         #endregion
 
         /// <summary>
@@ -416,6 +419,13 @@ namespace keyviewer.UI.Forms
         /// </summary>
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
+            // 바 모드 창 닫기
+            if (_barModeForm != null && !_barModeForm.IsDisposed)
+            {
+                _barModeForm.Close();
+                _barModeForm.Dispose();
+            }
+
             // 글로벌 키보드 훅 제거
             if (_hookID != IntPtr.Zero)
             {
@@ -903,9 +913,27 @@ namespace keyviewer.UI.Forms
             var exitItem = new ToolStripMenuItem("종료");
             exitItem.Click += (s, e) => this.Close();
 
+            // [바 모드] 메뉴 항목 - 별도 창에서 키 입력을 바 형식으로 표시
+            var barModeItem = new ToolStripMenuItem("바 모드");
+            barModeItem.Click += (s, e) =>
+            {
+                if (_barModeForm == null || _barModeForm.IsDisposed)
+                {
+                    _barModeForm = new BarModeForm(_keyPanels);
+                    _barModeForm.Show();
+                }
+                else
+                {
+                    _barModeForm.Focus();
+                    _barModeForm.BringToFront();
+                }
+            };
+
             // 메뉴 항목 추가
             _contextMenuStrip.Items.Add(toggleTopMost);
             _contextMenuStrip.Items.Add(toggleOBSMode);
+            _contextMenuStrip.Items.Add(new ToolStripSeparator());
+            _contextMenuStrip.Items.Add(barModeItem);
             _contextMenuStrip.Items.Add(new ToolStripSeparator());
             _contextMenuStrip.Items.Add(layoutsItem);
             _contextMenuStrip.Items.Add(saveLayoutItem);

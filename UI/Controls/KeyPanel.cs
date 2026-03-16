@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -99,6 +100,9 @@ public class KeyPanel
     private bool _isKeyDown = false;
     private bool _obsCompatibilityMode = false; // OBS 호환 모드
 
+    /// <summary>현재 키 상태 (눌린 상태 조회용)</summary>
+    public bool IsKeyPressed => _isKeyDown;
+
     public bool BorderEnabled { get; set; }
     public Color BorderColor { get; set; } = Color.Black;
     public int BorderWidth { get; set; } = 2;
@@ -141,11 +145,13 @@ public class KeyPanel
                 
                 // 🆕 테두리를 고려한 정확한 사각형 계산
                 float halfBorder = BorderEnabled ? BorderWidth / 2.0f : 0f;
+                float drawWidth = Math.Max(1f, Panel.Width - BorderWidth - 1f);
+                float drawHeight = Math.Max(1f, Panel.Height - BorderWidth - 1f);
                 RectangleF drawRect = new RectangleF(
                     halfBorder, 
                     halfBorder, 
-                    Panel.Width - BorderWidth, 
-                    Panel.Height - BorderWidth);
+                    drawWidth, 
+                    drawHeight);
                 
                 // 둥글은 모서리 처리
                 if (CornerRadius > 0)
@@ -171,7 +177,7 @@ public class KeyPanel
                     {
                         using var pen = new Pen(BorderColor, BorderWidth);
                         e.Graphics.DrawRectangle(pen, halfBorder, halfBorder, 
-                            Panel.Width - BorderWidth, Panel.Height - BorderWidth);
+                            drawWidth, drawHeight);
                     }
                     
                     Panel.Region = null;
@@ -366,7 +372,9 @@ public class KeyPanel
 
             // 🆕 테두리를 고려한 정확한 사각형 계산
             float halfBorder = BorderEnabled ? BorderWidth / 2.0f : 0f;
-            RectangleF drawRect = new RectangleF(halfBorder, halfBorder, w - BorderWidth, h - BorderWidth);
+            float drawWidth = Math.Max(1f, w - BorderWidth - 1f);
+            float drawHeight = Math.Max(1f, h - BorderWidth - 1f);
+            RectangleF drawRect = new RectangleF(halfBorder, halfBorder, drawWidth, drawHeight);
 
             // 둥글 모서리 처리
             if (CornerRadius > 0)
@@ -394,7 +402,7 @@ public class KeyPanel
                 if (BorderEnabled)
                 {
                     using var pen = new Pen(BorderColor, BorderWidth);
-                    g.DrawRectangle(pen, halfBorder, halfBorder, w - BorderWidth, h - BorderWidth);
+                    g.DrawRectangle(pen, halfBorder, halfBorder, drawWidth, drawHeight);
                 }
             }
 
